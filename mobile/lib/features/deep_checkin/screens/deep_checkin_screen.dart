@@ -131,6 +131,16 @@ class _DeepCheckinScreenState extends State<DeepCheckinScreen> {
       );
 
       savedDeepCheckinId = response["assessment_id"]?.toString();
+
+      try {
+        await ApiClient.post(
+          "/patterns/backfill",
+          auth: true,
+          body: {},
+        );
+      } catch (_) {
+        // Não bloqueia o resultado se a sincronização dos padrões falhar.
+      }
     } catch (_) {
       // Não bloqueia o resultado se houver falha ao salvar.
       // O usuário ainda consegue ver o resultado na tela.
@@ -1092,6 +1102,7 @@ class _DimensionLine extends StatelessWidget {
     );
   }
 }
+
 
 
 

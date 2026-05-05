@@ -25,7 +25,20 @@ class _ResultScreenState extends State<ResultScreen> {
   @override
   void initState() {
     super.initState();
+    syncStoredPatterns();
     loadPatterns();
+  }
+
+  Future<void> syncStoredPatterns() async {
+    try {
+      await ApiClient.post(
+        "/patterns/backfill",
+        auth: true,
+        body: {},
+      );
+    } catch (_) {
+      // Não bloqueia a tela de resultado se a sincronização falhar.
+    }
   }
 
   Future<void> loadPatterns() async {
@@ -856,3 +869,4 @@ class _SafetyCard extends StatelessWidget {
     );
   }
 }
+

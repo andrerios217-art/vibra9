@@ -2773,3 +2773,280 @@ def get_recurring_patterns(user: Dict[str, Any] = Depends(get_current_user)):
         "patterns": recurring[:5],
         "disclaimer": "Padrões recorrentes são sinais de reflexão baseados nos seus registros. Não representam diagnóstico."
     }
+
+def ensure_assessment_patterns_table():
+    conn = get_connection()
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assessment_patterns (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            assessment_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            label TEXT NOT NULL,
+            area TEXT NOT NULL,
+            pattern_group TEXT NOT NULL,
+            pattern_score INTEGER NOT NULL,
+            safe_text TEXT NOT NULL,
+            reflection TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def detect_patterns_from_dimensions(dimensions: list) -> list:
+    detected = []
+
+    for pattern in PATTERN_BANK:
+        score = score_pattern_from_dimensions(pattern, dimensions)
+
+        if score <= 0:
+            continue
+
+        detected.append({
+            "id": pattern["id"],
+            "label": pattern["label"],
+            "area": pattern["area"],
+            "group": pattern["group"],
+            "score": score,
+            "safe_text": pattern["safe_text"],
+            "reflection": pattern["reflection"],
+        })
+
+    detected.sort(key=lambda item: item["score"], reverse=True)
+
+    return detected[:5]
+
+
+def save_patterns_for_assessment(
+    user_id: str,
+    assessment_id: str,
+    dimensions: list,
+    created_at: str,
+):
+    ensure_assessment_patterns_table()
+
+    detected = detect_patterns_from_dimensions(dimensions)
+
+    conn = get_connection()
+
+    conn.execute(
+        """
+        DELETE FROM assessment_patterns
+        WHERE user_id = ? AND assessment_id = ?
+        """,
+        (user_id, assessment_id)
+    )
+
+    for pattern in detected:
+        conn.execute(
+            """
+            INSERT INTO assessment_patterns (
+                id,
+                user_id,
+                assessment_id,
+                pattern_id,
+                label,
+                area,
+                pattern_group,
+                pattern_score,
+                safe_text,
+                reflection,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                user_id,
+                assessment_id,
+                pattern["id"],
+                pattern["label"],
+                pattern["area"],
+                pattern["group"],
+                pattern["score"],
+                pattern["safe_text"],
+                pattern["reflection"],
+                created_at,
+            )
+        )
+
+    conn.commit()
+    conn.close()
+
+    return detected
+
+
+@app.post("/patterns/backfill")
+def backfill_assessment_patterns(user: Dict[str, Any] = Depends(get_current_user)):
+    require_active_subscription(user)
+    ensure_assessment_patterns_table()
+
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM assessments
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        """,
+        (user["id"],)
+    ).fetchall()
+    conn.close()
+
+    total_assessments = 0
+    total_patterns = 0
+
+    for row in rows:
+        assessment = dict(row)
+        dimensions = json.loads(assessment["dimensions_json"])
+
+        detected = save_patterns_for_assessment(
+            user_id=user["id"],
+            assessment_id=assessment["id"],
+            dimensions=dimensions,
+            created_at=assessment["created_at"],
+        )
+
+        total_assessments += 1
+        total_patterns += len(detected)
+
+    return {
+        "message": "Padrões recalculados e salvos com sucesso.",
+        "assessments_processed": total_assessments,
+        "patterns_saved": total_patterns,
+    }
+
+
+@app.get("/patterns/stored/latest")
+def get_latest_stored_patterns(user: Dict[str, Any] = Depends(get_current_user)):
+    require_active_subscription(user)
+    ensure_assessment_patterns_table()
+
+    conn = get_connection()
+
+    latest = conn.execute(
+        """
+        SELECT id
+        FROM assessments
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (user["id"],)
+    ).fetchone()
+
+    if latest is None:
+        conn.close()
+
+        return {
+            "has_data": False,
+            "patterns": [],
+            "message": "Faça uma avaliação para visualizar padrões salvos."
+        }
+
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM assessment_patterns
+        WHERE user_id = ? AND assessment_id = ?
+        ORDER BY pattern_score DESC
+        """,
+        (user["id"], latest["id"])
+    ).fetchall()
+
+    conn.close()
+
+    patterns = []
+
+    for row in rows:
+        item = dict(row)
+
+        patterns.append({
+            "id": item["pattern_id"],
+            "label": item["label"],
+            "area": item["area"],
+            "group": item["pattern_group"],
+            "score": item["pattern_score"],
+            "safe_text": item["safe_text"],
+            "reflection": item["reflection"],
+        })
+
+    return {
+        "has_data": True,
+        "assessment_id": latest["id"],
+        "patterns": patterns,
+        "disclaimer": "Esses padrões são hipóteses de reflexão baseadas nas suas respostas. Não representam diagnóstico."
+    }
+
+@app.get("/history/with-patterns")
+def get_history_with_patterns(user: Dict[str, Any] = Depends(get_current_user)):
+    require_active_subscription(user)
+    ensure_assessment_patterns_table()
+
+    conn = get_connection()
+
+    assessment_rows = conn.execute(
+        """
+        SELECT *
+        FROM assessments
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 30
+        """,
+        (user["id"],)
+    ).fetchall()
+
+    pattern_rows = conn.execute(
+        """
+        SELECT *
+        FROM assessment_patterns
+        WHERE user_id = ?
+        ORDER BY pattern_score DESC
+        """,
+        (user["id"],)
+    ).fetchall()
+
+    conn.close()
+
+    patterns_by_assessment = {}
+
+    for row in pattern_rows:
+        item = dict(row)
+        assessment_id = item["assessment_id"]
+
+        if assessment_id not in patterns_by_assessment:
+            patterns_by_assessment[assessment_id] = []
+
+        patterns_by_assessment[assessment_id].append({
+            "id": item["pattern_id"],
+            "label": item["label"],
+            "area": item["area"],
+            "group": item["pattern_group"],
+            "score": item["pattern_score"],
+            "safe_text": item["safe_text"],
+            "reflection": item["reflection"],
+        })
+
+    items = []
+
+    for row in assessment_rows:
+        assessment = dict(row)
+        dimensions = json.loads(assessment["dimensions_json"])
+
+        items.append({
+            "id": assessment["id"],
+            "general_score": assessment["general_score"],
+            "dimensions": dimensions,
+            "created_at": assessment["created_at"],
+            "patterns": patterns_by_assessment.get(assessment["id"], [])[:3],
+        })
+
+    return {
+        "items": items,
+        "disclaimer": "Padrões são hipóteses de reflexão baseadas nas respostas. Não representam diagnóstico."
+    }
