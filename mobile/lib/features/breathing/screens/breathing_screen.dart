@@ -258,3 +258,4 @@ class _BreathingScreenState extends State<BreathingScreen>
     );
   }
 }
+

@@ -221,7 +221,7 @@ class _TodayScreenState extends State<TodayScreen> {
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          "Comece seu check-in",
+                          "Comece seu check-up",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 26,
@@ -468,3 +468,4 @@ class _ResponsibleNote extends StatelessWidget {
     );
   }
 }
+

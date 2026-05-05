@@ -482,3 +482,4 @@ class _MiniDimensionBar extends StatelessWidget {
     );
   }
 }
+

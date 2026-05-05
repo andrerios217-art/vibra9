@@ -3,7 +3,7 @@ import "../../../core/services/api_client.dart";
 import "../../../core/services/token_storage.dart";
 import "../../../core/widgets/app_button.dart";
 import "../../../core/widgets/app_input.dart";
-import "../../home/screens/home_screen.dart";
+import "../../navigation/screens/app_shell_screen.dart";
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -52,7 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const AppShellScreen()),
       );
     } catch (error) {
       if (!mounted) return;
@@ -147,3 +147,5 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+
+

@@ -1,7 +1,9 @@
 ﻿import "package:flutter/material.dart";
-import "../../home/screens/home_screen.dart";
+import "../../../core/services/api_client.dart";
+import "../../navigation/screens/app_shell_screen.dart";
+import "../../patterns/screens/patterns_screen.dart";
 
-class ResultScreen extends StatelessWidget {
+class ResultScreen extends StatefulWidget {
   final Map<String, dynamic> assessment;
   final Map<String, dynamic> recommendation;
 
@@ -10,6 +12,44 @@ class ResultScreen extends StatelessWidget {
     required this.assessment,
     required this.recommendation,
   });
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  bool loadingPatterns = true;
+  List<dynamic> patterns = [];
+  String? patternError;
+
+  @override
+  void initState() {
+    super.initState();
+    loadPatterns();
+  }
+
+  Future<void> loadPatterns() async {
+    try {
+      final response = await ApiClient.get(
+        "/patterns/latest",
+        auth: true,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        patterns = response["patterns"] as List<dynamic>? ?? [];
+        loadingPatterns = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        patternError = error.toString().replaceAll("Exception: ", "");
+        loadingPatterns = false;
+      });
+    }
+  }
 
   Color scoreColor(int score) {
     if (score <= 40) {
@@ -47,11 +87,26 @@ class ResultScreen extends StatelessWidget {
     return const Color(0xFF59B36A);
   }
 
+  void goHome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const AppShellScreen()),
+      (_) => false,
+    );
+  }
+
+  void openPatterns() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PatternsScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final int generalScore = assessment["general_score"] as int;
-    final dimensions = assessment["dimensions"] as List<dynamic>;
-    final actions = recommendation["daily_actions"] as List<dynamic>;
+    final int generalScore = widget.assessment["general_score"] as int;
+    final dimensions = widget.assessment["dimensions"] as List<dynamic>;
+    final actions = widget.recommendation["daily_actions"] as List<dynamic>;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F5FF),
@@ -61,13 +116,7 @@ class ResultScreen extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: "Início",
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const HomeScreen()),
-                (_) => false,
-              );
-            },
+            onPressed: goHome,
             icon: const Icon(Icons.home_rounded),
           ),
         ],
@@ -80,11 +129,18 @@ class ResultScreen extends StatelessWidget {
               score: generalScore,
               label: scoreLabel(generalScore),
               color: scoreColor(generalScore),
-              summary: recommendation["summary"].toString(),
+              summary: widget.recommendation["summary"].toString(),
             ),
             const SizedBox(height: 20),
             _FocusCard(
-              focus: recommendation["main_focus"].toString(),
+              focus: widget.recommendation["main_focus"].toString(),
+            ),
+            const SizedBox(height: 20),
+            _PatternsPreviewCard(
+              loading: loadingPatterns,
+              patterns: patterns,
+              error: patternError,
+              onOpen: openPatterns,
             ),
             const SizedBox(height: 20),
             _SectionTitle(
@@ -98,7 +154,8 @@ class ResultScreen extends StatelessWidget {
             const SizedBox(height: 22),
             _SectionTitle(
               title: "Suas 9 dimensões",
-              subtitle: "Veja onde você está mais forte e onde pode cuidar melhor.",
+              subtitle:
+                  "Veja onde você está mais forte e onde pode cuidar melhor.",
             ),
             const SizedBox(height: 12),
             ...dimensions.map(
@@ -115,24 +172,18 @@ class ResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             _QuoteCard(
-              quote: recommendation["quote"].toString(),
-              author: recommendation["quote_author"].toString(),
+              quote: widget.recommendation["quote"].toString(),
+              author: widget.recommendation["quote_author"].toString(),
             ),
             const SizedBox(height: 18),
             _SafetyCard(
-              text: recommendation["safety_note"].toString(),
+              text: widget.recommendation["safety_note"].toString(),
             ),
             const SizedBox(height: 24),
             SizedBox(
               height: 56,
               child: FilledButton.icon(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                    (_) => false,
-                  );
-                },
+                onPressed: goHome,
                 icon: const Icon(Icons.check_rounded),
                 label: const Text(
                   "Concluir",
@@ -313,6 +364,220 @@ class _FocusCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PatternsPreviewCard extends StatelessWidget {
+  final bool loading;
+  final List<dynamic> patterns;
+  final String? error;
+  final VoidCallback onOpen;
+
+  const _PatternsPreviewCard({
+    required this.loading,
+    required this.patterns,
+    required this.error,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                "Buscando padrões percebidos...",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B6F8A),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (error != null) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8505B).withOpacity(0.07),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              color: Color(0xFFE8505B),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Não foi possível carregar padrões agora.",
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: Color(0xFF1F2544),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (patterns.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.account_tree_rounded,
+              color: Color(0xFF6B4FD8),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Nenhum padrão relevante foi identificado neste resultado.",
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: Color(0xFF6B6F8A),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: const Color(0xFF6B4FD8).withOpacity(0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6B4FD8).withOpacity(0.05),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B4FD8).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.account_tree_rounded,
+                  color: Color(0xFF6B4FD8),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  "Padrões percebidos",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1F2544),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "Hipóteses de reflexão baseadas nas suas respostas. Não representam diagnóstico.",
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              color: Color(0xFF6B6F8A),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...patterns.take(3).map((item) {
+            final pattern = Map<String, dynamic>.from(item);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F5FF),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.circle,
+                    size: 9,
+                    color: Color(0xFF6B4FD8),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      pattern["label"]?.toString() ?? "",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF1F2544),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onOpen,
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text(
+                "Ver mapa completo",
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ),
         ],

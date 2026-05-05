@@ -359,3 +359,4 @@ class _RitualItem extends StatelessWidget {
     );
   }
 }
+

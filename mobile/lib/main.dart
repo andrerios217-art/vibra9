@@ -3,7 +3,7 @@ import "package:shared_preferences/shared_preferences.dart";
 import "core/services/token_storage.dart";
 import "core/theme/app_theme.dart";
 import "features/auth/screens/login_screen.dart";
-import "features/home/screens/home_screen.dart";
+import "features/navigation/screens/app_shell_screen.dart";
 import "features/onboarding/screens/onboarding_screen.dart";
 
 void main() {
@@ -67,7 +67,7 @@ class _SessionGateState extends State<SessionGate> {
     }
 
     if (logged) {
-      return const HomeScreen();
+      return const AppShellScreen();
     }
 
     if (!onboardingSeen) {
@@ -77,3 +77,4 @@ class _SessionGateState extends State<SessionGate> {
     return const LoginScreen();
   }
 }
+

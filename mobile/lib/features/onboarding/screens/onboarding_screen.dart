@@ -1,5 +1,6 @@
 ﻿import "package:flutter/material.dart";
 import "package:shared_preferences/shared_preferences.dart";
+import "../../../core/widgets/app_logo.dart";
 import "../../auth/screens/login_screen.dart";
 import "../../auth/screens/register_screen.dart";
 
@@ -19,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.favorite_rounded,
       title: "Conheça seu momento",
       text:
-          "Faça um check-in rápido em 9 dimensões e entenda como está seu equilíbrio hoje.",
+          "Faça um check-up rápido em 9 dimensões e entenda como está seu equilíbrio hoje.",
       color: Color(0xFF6B4FD8),
     ),
     _OnboardingPageData(
@@ -66,6 +67,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final isLast = currentPage == pages.length - 1;
+    final page = pages[currentPage];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F5FF),
@@ -82,6 +84,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
               const SizedBox(height: 10),
+              const AppLogo(size: 128),
+              const SizedBox(height: 18),
               Expanded(
                 child: PageView.builder(
                   controller: controller,
@@ -90,34 +94,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     setState(() => currentPage = index);
                   },
                   itemBuilder: (context, index) {
-                    final page = pages[index];
+                    final item = pages[index];
 
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 132,
-                          height: 132,
+                          width: 82,
+                          height: 82,
                           decoration: BoxDecoration(
-                            color: page.color.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(42),
-                            boxShadow: [
-                              BoxShadow(
-                                color: page.color.withOpacity(0.12),
-                                blurRadius: 30,
-                                offset: const Offset(0, 14),
-                              ),
-                            ],
+                            color: item.color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(28),
                           ),
                           child: Icon(
-                            page.icon,
-                            size: 68,
-                            color: page.color,
+                            item.icon,
+                            size: 42,
+                            color: item.color,
                           ),
                         ),
-                        const SizedBox(height: 36),
+                        const SizedBox(height: 30),
                         Text(
-                          page.title,
+                          item.title,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 31,
@@ -128,7 +125,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          page.text,
+                          item.text,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 17,
@@ -153,7 +150,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     height: 9,
                     decoration: BoxDecoration(
                       color: active
-                          ? const Color(0xFF6B4FD8)
+                          ? page.color
                           : const Color(0xFF6B4FD8).withOpacity(0.18),
                       borderRadius: BorderRadius.circular(999),
                     ),

@@ -1,6 +1,6 @@
-{
-    "name": "vibra9",
-    "short_name": "vibra9",
+﻿{
+    "name": "Vibra9",
+    "short_name": "Vibra9",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
@@ -33,3 +33,4 @@
         }
     ]
 }
+

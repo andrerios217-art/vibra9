@@ -1,5 +1,5 @@
 ﻿import "package:flutter/material.dart";
-import "../../home/screens/home_screen.dart";
+import "../../navigation/screens/app_shell_screen.dart";
 
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
@@ -7,7 +7,7 @@ class SubscriptionScreen extends StatelessWidget {
   void activateDemo(BuildContext context) {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const AppShellScreen()),
       (_) => false,
     );
   }
@@ -212,3 +212,5 @@ class _BenefitTile extends StatelessWidget {
     );
   }
 }
+
+

@@ -570,3 +570,4 @@ class PracticeDetailScreen extends StatelessWidget {
     );
   }
 }
+

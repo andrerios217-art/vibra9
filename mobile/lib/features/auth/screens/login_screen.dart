@@ -1,9 +1,10 @@
 ﻿import "package:flutter/material.dart";
+import "../../../core/widgets/app_logo.dart";
 import "../../../core/services/api_client.dart";
 import "../../../core/services/token_storage.dart";
 import "../../../core/widgets/app_button.dart";
 import "../../../core/widgets/app_input.dart";
-import "../../home/screens/home_screen.dart";
+import "../../navigation/screens/app_shell_screen.dart";
 import "register_screen.dart";
 
 class LoginScreen extends StatefulWidget {
@@ -41,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const AppShellScreen()),
       );
     } catch (error) {
       if (!mounted) return;
@@ -128,3 +129,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
+
+
