@@ -49,3 +49,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local backups
+backend/*backup*.py
+backend/*_backup*.py
+backend/main_backup*.py
