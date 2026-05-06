@@ -1,4 +1,5 @@
-﻿import hmac
+﻿import secrets
+import hmac
 import hashlib
 import os
 import json
@@ -53,6 +54,24 @@ app.add_middleware(
 # DATABASE
 # ============================================================
 
+def ensure_user_trial_columns():
+    conn = sqlite3.connect(DB_PATH)
+    columns = conn.execute("PRAGMA table_info(users)").fetchall()
+    existing = {column[1] for column in columns}
+
+    if "subscription_status" not in existing:
+        conn.execute("ALTER TABLE users ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'trial'")
+
+    if "trial_start" not in existing:
+        conn.execute("ALTER TABLE users ADD COLUMN trial_start TEXT")
+
+    if "trial_end" not in existing:
+        conn.execute("ALTER TABLE users ADD COLUMN trial_end TEXT")
+
+    conn.commit()
+    conn.close()
+
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -67,13 +86,14 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
+            email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            privacy_policy_accepted_at TEXT NOT NULL,
-            terms_accepted_at TEXT NOT NULL,
-            subscription_active INTEGER NOT NULL DEFAULT 1,
-            subscription_source TEXT NOT NULL DEFAULT 'mvp_manual'
+            privacy_policy_accepted INTEGER NOT NULL DEFAULT 0,
+            terms_accepted INTEGER NOT NULL DEFAULT 0,
+            subscription_status TEXT NOT NULL DEFAULT 'trial',
+            trial_start TEXT,
+            trial_end TEXT,
+            created_at TEXT NOT NULL
         )
     """)
 
@@ -619,33 +639,33 @@ def health_check():
 
 @app.post("/auth/register", response_model=AuthResponse)
 def register(payload: RegisterRequest):
-    if not payload.privacy_policy_accepted:
+    email = payload.email.strip().lower()
+
+    if not payload.privacy_policy_accepted or not payload.terms_accepted:
         raise HTTPException(
             status_code=400,
-            detail="É necessário aceitar a Política de Privacidade."
+            detail="É necessário aceitar a política de privacidade e os termos de uso."
         )
-
-    if not payload.terms_accepted:
-        raise HTTPException(
-            status_code=400,
-            detail="É necessário aceitar os Termos de Uso."
-        )
-
-    email = normalize_email(payload.email)
 
     conn = get_connection()
 
-    existing = conn.execute(
+    existing_user = conn.execute(
         "SELECT id FROM users WHERE email = ?",
         (email,)
     ).fetchone()
 
-    if existing:
+    if existing_user:
         conn.close()
-        raise HTTPException(status_code=409, detail="E-mail já cadastrado.")
+        raise HTTPException(
+            status_code=409,
+            detail="E-mail já cadastrado."
+        )
 
     user_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    created_at_dt = datetime.now(timezone.utc)
+    created_at = created_at_dt.isoformat()
+    trial_start = created_at_dt
+    trial_end = trial_start + timedelta(days=15)
 
     conn.execute(
         """
@@ -654,23 +674,29 @@ def register(payload: RegisterRequest):
             name,
             email,
             password_hash,
-            created_at,
+            privacy_policy_accepted,
+            terms_accepted,
             privacy_policy_accepted_at,
             terms_accepted_at,
-            subscription_active,
-            subscription_source
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            subscription_status,
+            trial_start,
+            trial_end,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             user_id,
             payload.name.strip(),
             email,
             hash_password(payload.password),
-            now,
-            now,
-            now,
-            1,
-            "mvp_manual",
+            1 if payload.privacy_policy_accepted else 0,
+            1 if payload.terms_accepted else 0,
+            created_at,
+            created_at,
+            "trial",
+            trial_start.isoformat(),
+            trial_end.isoformat(),
+            created_at,
         )
     )
 
@@ -681,9 +707,10 @@ def register(payload: RegisterRequest):
 
     return AuthResponse(
         access_token=token,
+        token_type="bearer",
         user_id=user_id,
         name=payload.name.strip(),
-        email=email,
+        email=email
     )
 
 
@@ -859,14 +886,25 @@ async def create_recommendation(
     require_active_subscription(user)
 
     conn = get_connection()
+
     row = conn.execute(
-        "SELECT * FROM assessments WHERE id = ? AND user_id = ?",
-        (payload.assessment_id, user["id"])
+        """
+        SELECT *
+        FROM assessments
+        WHERE id = ? AND user_id = ?
+        """,
+        (
+            payload.assessment_id,
+            user["id"],
+        )
     ).fetchone()
 
     if not row:
         conn.close()
-        raise HTTPException(status_code=404, detail="Avaliação não encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail="Avaliação não encontrada."
+        )
 
     assessment = dict(row)
     assessment["dimensions"] = json.loads(assessment["dimensions_json"])
@@ -875,11 +913,11 @@ async def create_recommendation(
     quote = await get_external_quote()
 
     recommendation_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now(timezone.utc).isoformat()
 
     safety_note = (
-        "Este app oferece orientações gerais de bem-estar e autoconhecimento. "
-        "Ele não substitui acompanhamento médico, psicológico, financeiro ou terapêutico."
+        "O Vibra9 oferece orientações gerais de bem-estar e autoconhecimento. "
+        "Não substitui acompanhamento médico, psicológico ou profissional."
     )
 
     conn.execute(
@@ -900,31 +938,32 @@ async def create_recommendation(
         (
             recommendation_id,
             user["id"],
-            assessment["id"],
+            payload.assessment_id,
             generated["summary"],
             generated["main_focus"],
             json.dumps(generated["daily_actions"], ensure_ascii=False),
             quote["quote"],
             quote["author"],
             safety_note,
-            now,
+            created_at,
         )
     )
 
     conn.commit()
     conn.close()
 
-    return RecommendationResponse(
-        recommendation_id=recommendation_id,
-        assessment_id=assessment["id"],
-        summary=generated["summary"],
-        main_focus=generated["main_focus"],
-        daily_actions=generated["daily_actions"],
-        quote=quote["quote"],
-        quote_author=quote["author"],
-        safety_note=safety_note,
-        created_at=now,
-    )
+    return {
+        "id": recommendation_id,
+        "recommendation_id": recommendation_id,
+        "assessment_id": payload.assessment_id,
+        "summary": generated["summary"],
+        "main_focus": generated["main_focus"],
+        "daily_actions": generated["daily_actions"],
+        "quote": quote["quote"],
+        "quote_author": quote["author"],
+        "safety_note": safety_note,
+        "created_at": created_at,
+    }
 
 
 @app.get("/history")
@@ -1714,6 +1753,13 @@ def get_history_with_patterns(user: Dict[str, Any] = Depends(get_current_user)):
         "items": items,
         "disclaimer": "Padrões são hipóteses de reflexão baseadas nas respostas. Não representam diagnóstico."
     }
+
+
+
+
+
+
+
 
 
 
