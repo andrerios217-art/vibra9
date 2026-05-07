@@ -1,5 +1,6 @@
 ﻿import "package:flutter/material.dart";
 import "../../../core/services/api_client.dart";
+import "history_detail_screen.dart";
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -21,19 +22,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> loadHistory() async {
-    setState(() {
-      loading = true;
-      errorMessage = null;
-    });
-
+    setState(() { loading = true; errorMessage = null; });
     try {
-      final response = await ApiClient.get(
-        "/history/with-patterns",
-        auth: true,
-      );
-
+      final response = await ApiClient.get("/history/with-patterns", auth: true);
       if (!mounted) return;
-
       setState(() {
         items = response["items"] as List<dynamic>;
         disclaimer = response["disclaimer"]?.toString();
@@ -41,7 +33,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       });
     } catch (error) {
       if (!mounted) return;
-
       setState(() {
         errorMessage = error.toString().replaceAll("Exception: ", "");
         loading = false;
@@ -63,16 +54,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   String formatDate(String value) {
     final parsed = DateTime.tryParse(value);
-
     if (parsed == null) return value;
-
     final local = parsed.toLocal();
-    final day = local.day.toString().padLeft(2, "0");
-    final month = local.month.toString().padLeft(2, "0");
-    final hour = local.hour.toString().padLeft(2, "0");
-    final minute = local.minute.toString().padLeft(2, "0");
-
-    return "$day/$month às $hour:$minute";
+    return "${local.day.toString().padLeft(2, "0")}/${local.month.toString().padLeft(2, "0")} às ${local.hour.toString().padLeft(2, "0")}:${local.minute.toString().padLeft(2, "0")}";
   }
 
   @override
@@ -93,10 +77,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: loading
             ? const Center(child: CircularProgressIndicator())
             : errorMessage != null
-                ? _ErrorState(
-                    message: errorMessage!,
-                    onRetry: loadHistory,
-                  )
+                ? _ErrorState(message: errorMessage!, onRetry: loadHistory)
                 : RefreshIndicator(
                     onRefresh: loadHistory,
                     child: items.isEmpty
@@ -107,21 +88,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               const _HeroCard(),
                               const SizedBox(height: 20),
                               ...items.map((item) {
-                                final assessment =
-                                    Map<String, dynamic>.from(item);
-                                final score =
-                                    assessment["general_score"] as int;
-                                final patterns =
-                                    assessment["patterns"] as List<dynamic>;
-
+                                final assessment = Map<String, dynamic>.from(item);
+                                final score = assessment["general_score"] as int;
+                                final patterns = assessment["patterns"] as List<dynamic>;
+                                final assessmentId = assessment["id"].toString();
                                 return _HistoryCard(
+                                  assessmentId: assessmentId,
                                   score: score,
                                   color: scoreColor(score),
                                   label: scoreLabel(score),
-                                  date: formatDate(
-                                    assessment["created_at"].toString(),
-                                  ),
+                                  date: formatDate(assessment["created_at"].toString()),
                                   patterns: patterns,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => HistoryDetailScreen(
+                                          assessmentId: assessmentId,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 );
                               }),
                               if (disclaimer != null) ...[
@@ -138,54 +125,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
 class _HeroCard extends StatelessWidget {
   const _HeroCard();
-
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF6B4FD8),
-            Color(0xFF42B8B0),
-          ],
-        ),
+        gradient: const LinearGradient(colors: [Color(0xFF6B4FD8), Color(0xFF42B8B0)]),
         borderRadius: BorderRadius.circular(34),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6B4FD8).withOpacity(0.18),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: const Color(0xFF6B4FD8).withOpacity(0.18), blurRadius: 30, offset: const Offset(0, 14))],
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.history_rounded,
-            color: Colors.white,
-            size: 44,
-          ),
+          Icon(Icons.history_rounded, color: Colors.white, size: 44),
           SizedBox(height: 18),
-          Text(
-            "Sua linha do tempo",
-            style: TextStyle(
-              fontSize: 27,
-              height: 1.15,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-          ),
+          Text("Sua linha do tempo", style: TextStyle(fontSize: 27, height: 1.15, fontWeight: FontWeight.w900, color: Colors.white)),
           SizedBox(height: 8),
-          Text(
-            "Veja seus resultados e os padrões percebidos em cada registro.",
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.45,
-              color: Colors.white70,
-            ),
-          ),
+          Text("Toque em um registro para ver o resultado completo.", style: TextStyle(fontSize: 15, height: 1.45, color: Colors.white70)),
         ],
       ),
     );
@@ -193,151 +149,113 @@ class _HeroCard extends StatelessWidget {
 }
 
 class _HistoryCard extends StatelessWidget {
+  final String assessmentId;
   final int score;
   final Color color;
   final String label;
   final String date;
   final List<dynamic> patterns;
+  final VoidCallback onTap;
 
   const _HistoryCard({
+    required this.assessmentId,
     required this.score,
     required this.color,
     required this.label,
     required this.date,
     required this.patterns,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: color.withOpacity(0.12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: color.withOpacity(0.12)),
+          boxShadow: [BoxShadow(color: color.withOpacity(0.05), blurRadius: 22, offset: const Offset(0, 12))],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.05),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 72,
-                height: 72,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CircularProgressIndicator(
-                      value: score / 100,
-                      strokeWidth: 8,
-                      backgroundColor: color.withOpacity(0.10),
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                    ),
-                    Center(
-                      child: Text(
-                        "$score",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: color,
-                        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: 72, height: 72,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CircularProgressIndicator(
+                        value: score / 100,
+                        strokeWidth: 8,
+                        backgroundColor: color.withOpacity(0.10),
+                        valueColor: AlwaysStoppedAnimation<Color>(color),
                       ),
-                    ),
-                  ],
+                      Center(child: Text("$score", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color))),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF1F2544),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      date,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF6B6F8A),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
+                      const SizedBox(height: 4),
+                      Text(date, style: const TextStyle(fontSize: 13, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          if (patterns.isNotEmpty) ...[
-            const SizedBox(height: 18),
-            const Text(
-              "Padrões percebidos",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF1F2544),
-              ),
+                Icon(Icons.chevron_right_rounded, color: color, size: 28),
+              ],
             ),
-            const SizedBox(height: 10),
-            ...patterns.take(3).map((item) {
-              final pattern = Map<String, dynamic>.from(item);
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F5FF),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.account_tree_rounded,
-                      color: Color(0xFF6B4FD8),
-                      size: 19,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        pattern["label"]?.toString() ?? "",
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF1F2544),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ] else ...[
-            const SizedBox(height: 14),
-            const Text(
-              "Nenhum padrão salvo neste registro.",
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF6B6F8A),
-                fontWeight: FontWeight.w600,
+            if (patterns.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Text("Padrões percebidos", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
+              const SizedBox(height: 10),
+              ...patterns.take(3).map((item) {
+                final pattern = Map<String, dynamic>.from(item);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: const Color(0xFFF8F5FF), borderRadius: BorderRadius.circular(18)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.account_tree_rounded, color: Color(0xFF6B4FD8), size: 19),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(pattern["label"]?.toString() ?? "", style: const TextStyle(fontSize: 13, color: Color(0xFF1F2544), fontWeight: FontWeight.w800))),
+                    ],
+                  ),
+                );
+              }),
+            ] else ...[
+              const SizedBox(height: 14),
+              const Text("Nenhum padrão neste registro.", style: TextStyle(fontSize: 13, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w600)),
+            ],
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6B4FD8).withOpacity(0.07),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.visibility_rounded, color: Color(0xFF6B4FD8), size: 16),
+                  SizedBox(width: 6),
+                  Text("Ver resultado completo", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF6B4FD8))),
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -345,38 +263,18 @@ class _HistoryCard extends StatelessWidget {
 
 class _DisclaimerCard extends StatelessWidget {
   final String text;
-
-  const _DisclaimerCard({
-    required this.text,
-  });
-
+  const _DisclaimerCard({required this.text});
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8505B).withOpacity(0.07),
-        borderRadius: BorderRadius.circular(22),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFFE8505B).withOpacity(0.07), borderRadius: BorderRadius.circular(22)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            color: Color(0xFFE8505B),
-          ),
+          const Icon(Icons.info_outline_rounded, color: Color(0xFFE8505B)),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: Color(0xFF1F2544),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF1F2544), fontWeight: FontWeight.w700))),
         ],
       ),
     );
@@ -385,7 +283,6 @@ class _DisclaimerCard extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
-
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -393,37 +290,14 @@ class _EmptyState extends StatelessWidget {
       children: [
         Container(
           padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-          ),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
           child: const Column(
             children: [
-              Icon(
-                Icons.history_rounded,
-                color: Color(0xFF6B4FD8),
-                size: 52,
-              ),
+              Icon(Icons.history_rounded, color: Color(0xFF6B4FD8), size: 52),
               SizedBox(height: 16),
-              Text(
-                "Nenhum histórico ainda",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1F2544),
-                ),
-              ),
+              Text("Nenhum histórico ainda", textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
               SizedBox(height: 8),
-              Text(
-                "Faça uma avaliação para começar a acompanhar sua evolução.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.4,
-                  color: Color(0xFF6B6F8A),
-                ),
-              ),
+              Text("Faça uma avaliação para começar a acompanhar sua evolução.", textAlign: TextAlign.center, style: TextStyle(fontSize: 15, height: 1.4, color: Color(0xFF6B6F8A))),
             ],
           ),
         ),
@@ -435,12 +309,7 @@ class _EmptyState extends StatelessWidget {
 class _ErrorState extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
-
-  const _ErrorState({
-    required this.message,
-    required this.onRetry,
-  });
-
+  const _ErrorState({required this.message, required this.onRetry});
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -448,43 +317,17 @@ class _ErrorState extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Container(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-          ),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                color: Color(0xFFE8505B),
-                size: 48,
-              ),
+              const Icon(Icons.error_outline_rounded, color: Color(0xFFE8505B), size: 48),
               const SizedBox(height: 14),
-              const Text(
-                "Não foi possível carregar histórico.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1F2544),
-                ),
-              ),
+              const Text("Não foi possível carregar histórico.", textAlign: TextAlign.center, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
               const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: Color(0xFF6B6F8A),
-                ),
-              ),
+              Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF6B6F8A))),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onRetry,
-                child: const Text("Tentar novamente"),
-              ),
+              FilledButton(onPressed: onRetry, child: const Text("Tentar novamente")),
             ],
           ),
         ),

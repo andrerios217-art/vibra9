@@ -1,5 +1,4 @@
 ﻿import "package:flutter/material.dart";
-import "../../../core/widgets/app_logo.dart";
 import "../../../core/services/api_client.dart";
 import "../../../core/services/token_storage.dart";
 import "../../../core/widgets/app_button.dart";
@@ -16,45 +15,35 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController(text: "andre@test.com");
-  final passwordController = TextEditingController(text: "12345678");
-
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
   bool loading = false;
 
   Future<void> login() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Preencha e-mail e senha.")));
+      return;
+    }
     setState(() => loading = true);
-
     try {
-      final response = await ApiClient.post(
-        "/auth/login",
-        body: {
-          "email": emailController.text.trim(),
-          "password": passwordController.text.trim(),
-        },
-      );
-
+      final response = await ApiClient.post("/auth/login", body: {"email": email, "password": password});
       await TokenStorage.saveSession(
         token: response["access_token"],
+        refreshToken: response["refresh_token"] ?? "",
         name: response["name"],
         email: response["email"],
       );
-
       if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AppShellScreen()),
-      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AppShellScreen()));
     } catch (error) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceAll("Exception: ", ""))),
-      );
+        SnackBar(content: Text(error.toString().replaceAll("Exception: ", ""))));
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -67,77 +56,28 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               const SizedBox(height: 60),
-              const Icon(
-                Icons.spa_rounded,
-                size: 72,
-                color: Color(0xFF6B4FD8),
-              ),
+              const Icon(Icons.spa_rounded, size: 72, color: Color(0xFF6B4FD8)),
               const SizedBox(height: 18),
-              const Text(
-                "Entrar no Vibra9",
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1F2544),
-                ),
-              ),
+              const Text("Entrar no Vibra9", style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
               const SizedBox(height: 8),
-              const Text(
-                "Acesse sua jornada de bem-estar.",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF6B6F8A),
-                ),
-              ),
+              const Text("Acesse sua jornada de bem-estar.", style: TextStyle(fontSize: 16, color: Color(0xFF6B6F8A))),
               const SizedBox(height: 36),
-              AppInput(
-                controller: emailController,
-                label: "E-mail",
-                icon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-              ),
+              AppInput(controller: emailController, label: "E-mail", icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 14),
-              AppInput(
-                controller: passwordController,
-                label: "Senha",
-                icon: Icons.lock_outline,
-                obscureText: true,
-              ),
+              AppInput(controller: passwordController, label: "Senha", icon: Icons.lock_outline, obscureText: true),
               const SizedBox(height: 18),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: loading
-                      ? null
-                      : () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ForgotPasswordScreen(),
-                            ),
-                          );
-                        },
+                  onPressed: loading ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())),
                   child: const Text("Esqueci minha senha"),
                 ),
               ),
               const SizedBox(height: 12),
-              AppButton(
-                text: "Entrar",
-                loading: loading,
-                onPressed: login,
-              ),
+              AppButton(text: "Entrar", loading: loading, onPressed: login),
               const SizedBox(height: 20),
               TextButton(
-                onPressed: loading
-                    ? null
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
-                          ),
-                        );
-                      },
+                onPressed: loading ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
                 child: const Text("Ainda não tenho conta"),
               ),
             ],
@@ -147,7 +87,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-
-
-

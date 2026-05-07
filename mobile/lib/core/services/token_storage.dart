@@ -2,16 +2,19 @@
 
 class TokenStorage {
   static const String _tokenKey = "access_token";
+  static const String _refreshTokenKey = "refresh_token";
   static const String _nameKey = "user_name";
   static const String _emailKey = "user_email";
 
   static Future<void> saveSession({
     required String token,
+    required String refreshToken,
     required String name,
     required String email,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
+    await prefs.setString(_refreshTokenKey, refreshToken);
     await prefs.setString(_nameKey, name);
     await prefs.setString(_emailKey, email);
   }
@@ -19,6 +22,11 @@ class TokenStorage {
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey);
+  }
+
+  static Future<String?> getRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_refreshTokenKey);
   }
 
   static Future<String?> getName() async {
@@ -34,8 +42,8 @@ class TokenStorage {
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
+    await prefs.remove(_refreshTokenKey);
     await prefs.remove(_nameKey);
     await prefs.remove(_emailKey);
   }
 }
-
