@@ -6,6 +6,7 @@ import "../../../core/widgets/app_button.dart";
 import "../../../core/widgets/app_input.dart";
 import "../../navigation/screens/app_shell_screen.dart";
 import "register_screen.dart";
+import "forgot_password_screen.dart";
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -102,7 +103,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: Icons.lock_outline,
                 obscureText: true,
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: loading
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen(),
+                            ),
+                          );
+                        },
+                  child: const Text("Esqueci minha senha"),
+                ),
+              ),
+              const SizedBox(height: 12),
               AppButton(
                 text: "Entrar",
                 loading: loading,
@@ -129,6 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
 
 
 

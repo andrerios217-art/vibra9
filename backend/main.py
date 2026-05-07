@@ -1764,3 +1764,160 @@ def get_history_with_patterns(user: Dict[str, Any] = Depends(get_current_user)):
 
 
 
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=20)
+    new_password: str = Field(min_length=8)
+
+
+def ensure_password_reset_table():
+    conn = get_connection()
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+@app.post("/auth/request-password-reset")
+def request_password_reset(payload: PasswordResetRequest):
+    ensure_password_reset_table()
+
+    email = payload.email.strip().lower()
+    conn = get_connection()
+
+    user = conn.execute(
+        "SELECT id FROM users WHERE email = ?",
+        (email,)
+    ).fetchone()
+
+    response = {
+        "message": "Se o e-mail estiver cadastrado, enviaremos instruções para redefinir sua senha."
+    }
+
+    if not user:
+        conn.close()
+        return response
+
+    token = secrets.token_urlsafe(32)
+    token_hash = hash_reset_token(token)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=30)
+
+    conn.execute(
+        """
+        INSERT INTO password_reset_tokens (
+            id,
+            user_id,
+            token_hash,
+            expires_at,
+            used_at,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            str(uuid.uuid4()),
+            user["id"],
+            token_hash,
+            expires_at.isoformat(),
+            None,
+            now.isoformat(),
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    response["dev_reset_token"] = token
+    response["dev_note"] = "Modo desenvolvimento: este token será enviado por e-mail na versão de produção."
+
+    return response
+
+
+@app.post("/auth/reset-password")
+def reset_password(payload: PasswordResetConfirmRequest):
+    ensure_password_reset_table()
+
+    token_hash = hash_reset_token(payload.token.strip())
+    now = datetime.now(timezone.utc)
+
+    conn = get_connection()
+
+    row = conn.execute(
+        """
+        SELECT *
+        FROM password_reset_tokens
+        WHERE token_hash = ? AND used_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (token_hash,)
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Token inválido ou já utilizado."
+        )
+
+    token_data = dict(row)
+    expires_at = datetime.fromisoformat(token_data["expires_at"])
+
+    if now > expires_at:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Token expirado. Solicite uma nova redefinição de senha."
+        )
+
+    conn.execute(
+        """
+        UPDATE users
+        SET password_hash = ?
+        WHERE id = ?
+        """,
+        (
+            hash_password(payload.new_password),
+            token_data["user_id"],
+        )
+    )
+
+    conn.execute(
+        """
+        UPDATE password_reset_tokens
+        SET used_at = ?
+        WHERE id = ?
+        """,
+        (
+            now.isoformat(),
+            token_data["id"],
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "message": "Senha redefinida com sucesso. Você já pode entrar com a nova senha."
+    }
