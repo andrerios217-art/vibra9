@@ -1,4 +1,5 @@
-﻿import uuid
+﻿# -*- coding: utf-8 -*-
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,43 +23,43 @@ def get_privacy_policy():
     return {
         "version": PRIVACY_POLICY_VERSION,
         "updated_at": "2026-05-07",
-        "title": "Politica de Privacidade — Vibra9",
+        "title": "Política de Privacidade — Vibra9",
         "sections": [
             {
                 "title": "1. Quem somos",
-                "content": "O Vibra9 e um aplicativo de bem-estar emocional e autoconhecimento. Desenvolvido por Andre Rios, o app ajuda voce a entender seu estado emocional, identificar padroes e acompanhar sua evolucao ao longo do tempo."
+                "content": "O Vibra9 é um aplicativo de bem-estar emocional e autoconhecimento. Desenvolvido por André Rios, o app ajuda você a entender seu estado emocional, identificar padrões e acompanhar sua evolução ao longo do tempo."
             },
             {
                 "title": "2. Quais dados coletamos",
-                "content": "Coletamos: nome e e-mail para criacao de conta; respostas das avaliacoes emocionais (scores de 0 a 10 por dimensao); historico de avaliacoes e recomendacoes geradas; data e hora de acesso; dados de consentimento (versao e data de aceite dos termos)."
+                "content": "Coletamos: nome e e-mail para criação de conta; respostas das avaliações emocionais (scores de 0 a 10 por dimensão); histórico de avaliações e recomendações geradas; data e hora de acesso; dados de consentimento (versão e data de aceite dos termos)."
             },
             {
                 "title": "3. Como usamos seus dados",
-                "content": "Seus dados sao usados exclusivamente para: gerar avaliacoes e recomendacoes personalizadas; permitir que voce acompanhe sua evolucao; melhorar os algoritmos do app. Nao vendemos, compartilhamos nem usamos seus dados para publicidade."
+                "content": "Seus dados são usados exclusivamente para: gerar avaliações e recomendações personalizadas; permitir que você acompanhe sua evolução; melhorar os algoritmos do app. Não vendemos, compartilhamos nem usamos seus dados para publicidade."
             },
             {
                 "title": "4. Base legal (LGPD)",
-                "content": "O tratamento dos seus dados e fundamentado no seu consentimento explicito (Art. 7, I da LGPD). Voce pode revogar esse consentimento a qualquer momento excluindo sua conta."
+                "content": "O tratamento dos seus dados é fundamentado no seu consentimento explícito (Art. 7º, I da LGPD). Você pode revogar esse consentimento a qualquer momento excluindo sua conta."
             },
             {
                 "title": "5. Seus direitos",
-                "content": "Voce tem direito a: acessar seus dados (exportacao disponivel no app); corrigir dados incorretos; excluir sua conta e todos os dados associados; revogar o consentimento a qualquer momento; obter informacoes sobre o uso dos seus dados."
+                "content": "Você tem direito a: acessar seus dados (exportação disponível no app); corrigir dados incorretos; excluir sua conta e todos os dados associados; revogar o consentimento a qualquer momento; obter informações sobre o uso dos seus dados."
             },
             {
-                "title": "6. Seguranca",
-                "content": "Seus dados sao protegidos com: autenticacao JWT com tokens de curta duracao; senhas armazenadas com hash PBKDF2 + salt; comunicacao criptografada em producao (HTTPS); sem armazenamento de dados sensiveis desnecessarios."
+                "title": "6. Segurança",
+                "content": "Seus dados são protegidos com: autenticação JWT com tokens de curta duração; senhas armazenadas com hash PBKDF2 + salt; comunicação criptografada em produção (HTTPS); sem armazenamento de dados sensíveis desnecessários."
             },
             {
-                "title": "7. Retencao de dados",
-                "content": "Seus dados sao mantidos enquanto sua conta estiver ativa. Ao excluir a conta, todos os dados sao removidos permanentemente do banco de dados em ate 30 dias."
+                "title": "7. Retenção de dados",
+                "content": "Seus dados são mantidos enquanto sua conta estiver ativa. Ao excluir a conta, todos os dados são removidos permanentemente do banco de dados em até 30 dias."
             },
             {
                 "title": "8. Aviso importante",
-                "content": "O Vibra9 oferece orientacoes gerais de bem-estar e autoconhecimento. Nao substitui acompanhamento medico, psicologico ou terapeutico profissional."
+                "content": "O Vibra9 oferece orientações gerais de bem-estar e autoconhecimento. Não substitui acompanhamento médico, psicológico ou terapêutico profissional."
             },
             {
                 "title": "9. Contato",
-                "content": "Duvidas sobre privacidade? Entre em contato: contato@vibra9.app"
+                "content": "Dúvidas sobre privacidade? Entre em contato: contato@vibra9.app"
             }
         ]
     }
@@ -71,36 +72,36 @@ def get_terms():
         "title": "Termos de Uso — Vibra9",
         "sections": [
             {
-                "title": "1. Aceitacao",
-                "content": "Ao criar uma conta no Vibra9, voce concorda com estes Termos de Uso. Se nao concordar, nao utilize o app."
+                "title": "1. Aceitação",
+                "content": "Ao criar uma conta no Vibra9, você concorda com estes Termos de Uso. Se não concordar, não utilize o app."
             },
             {
-                "title": "2. O que e o Vibra9",
-                "content": "O Vibra9 e uma ferramenta de autoconhecimento e bem-estar emocional. As avaliacoes e recomendacoes sao orientacoes gerais baseadas nas suas respostas e nao constituem diagnostico ou tratamento medico ou psicologico."
+                "title": "2. O que é o Vibra9",
+                "content": "O Vibra9 é uma ferramenta de autoconhecimento e bem-estar emocional. As avaliações e recomendações são orientações gerais baseadas nas suas respostas e não constituem diagnóstico ou tratamento médico ou psicológico."
             },
             {
                 "title": "3. Uso adequado",
-                "content": "Voce se compromete a: fornecer informacoes verdadeiras no cadastro; nao compartilhar sua conta com terceiros; nao usar o app para fins ilegais; nao tentar acessar dados de outros usuarios."
+                "content": "Você se compromete a: fornecer informações verdadeiras no cadastro; não compartilhar sua conta com terceiros; não usar o app para fins ilegais; não tentar acessar dados de outros usuários."
             },
             {
                 "title": "4. Trial e assinatura",
-                "content": "O Vibra9 oferece trial gratuito de 15 dias com acesso completo. Apos o periodo de trial, e necessaria assinatura mensal para continuar utilizando as funcionalidades de avaliacao e historico."
+                "content": "O Vibra9 oferece trial gratuito de 15 dias com acesso completo. Após o período de trial, é necessária assinatura mensal para continuar utilizando as funcionalidades de avaliação e histórico."
             },
             {
                 "title": "5. Cancelamento",
-                "content": "Voce pode cancelar sua assinatura a qualquer momento. Ao excluir sua conta, todos os dados sao removidos e o acesso e encerrado imediatamente."
+                "content": "Você pode cancelar sua assinatura a qualquer momento. Ao excluir sua conta, todos os dados são removidos e o acesso é encerrado imediatamente."
             },
             {
-                "title": "6. Limitacao de responsabilidade",
-                "content": "O Vibra9 nao se responsabiliza por decisoes tomadas com base nas orientacoes do app. Em situacoes de crise emocional ou saude mental, procure ajuda profissional especializada."
+                "title": "6. Limitação de responsabilidade",
+                "content": "O Vibra9 não se responsabiliza por decisões tomadas com base nas orientações do app. Em situações de crise emocional ou saúde mental, procure ajuda profissional especializada."
             },
             {
-                "title": "7. Alteracoes",
-                "content": "Podemos atualizar estes termos. Voce sera notificado sobre mudancas significativas e precisara aceitar os novos termos para continuar usando o app."
+                "title": "7. Alterações",
+                "content": "Podemos atualizar estes termos. Você será notificado sobre mudanças significativas e precisará aceitar os novos termos para continuar usando o app."
             },
             {
                 "title": "8. Contato",
-                "content": "Duvidas sobre os termos? Entre em contato: contato@vibra9.app"
+                "content": "Dúvidas sobre os termos? Entre em contato: contato@vibra9.app"
             }
         ]
     }
@@ -108,7 +109,7 @@ def get_terms():
 @router.post("/consent")
 def record_consent(payload: ConsentRequest, user: Dict[str, Any] = Depends(get_current_user)):
     if not payload.privacy_policy_accepted or not payload.terms_accepted:
-        raise HTTPException(status_code=400, detail="Ambos os consentimentos sao obrigatorios.")
+        raise HTTPException(status_code=400, detail="Ambos os consentimentos são obrigatórios.")
     now = datetime.now(timezone.utc).isoformat()
     conn = get_connection()
     existing = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
