@@ -1,4 +1,5 @@
-﻿import json, uuid
+﻿# -*- coding: utf-8 -*-
+import json, uuid
 from typing import Any, Dict, List
 from fastapi import APIRouter, Depends
 from app.core.dependencies import get_current_user, check_subscription
@@ -32,24 +33,27 @@ def _generate_patterns(assessments: List[Dict]) -> List[Dict]:
                 "occurrences": low_count,
                 "avg_score": round(avg, 1),
                 "trend": trend,
-                "message": f"{label} apareceu com atencao em {low_count} das suas avaliacoes recentes."
+                "message": f"{label} apareceu com atenção em {low_count} das suas avaliações recentes.",
             })
     patterns.sort(key=lambda x: x["avg_score"])
     return patterns[:5]
 
 def _get_assessments(user_id: str, limit: int = 10) -> List[Dict]:
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT * FROM assessments WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
-        (user_id, limit)).fetchall()
-    conn.close()
-    result = []
-    for row in rows:
-        item = dict(row)
-        item["dimensions"] = json.loads(item["dimensions_json"])
-        result.append(item)
-    return result
+    try:
+        rows = conn.execute(
+            "SELECT * FROM assessments WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit)).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            item["dimensions"] = json.loads(item["dimensions_json"])
+            result.append(item)
+        return result
+    finally:
+        conn.close()
 
+# IMPORTANTE: rotas estáticas ANTES do wildcard
 @router.post("/backfill")
 def backfill_patterns(user: Dict[str, Any] = Depends(get_current_user)):
     check_subscription(user)
@@ -90,7 +94,7 @@ def get_recurring_patterns(user: Dict[str, Any] = Depends(get_current_user)):
                 "occurrences": len(scores),
                 "low_percentage": round(low_pct * 100),
                 "avg_score": round(sum(scores) / len(scores), 1),
-                "message": f"{label} aparece com atencao em {round(low_pct*100)}% das suas avaliacoes."
+                "message": f"{label} aparece com atenção em {round(low_pct*100)}% das suas avaliações.",
             })
     recurring.sort(key=lambda x: x["avg_score"])
     return {"patterns": recurring}

@@ -3,12 +3,14 @@ import "dart:math" as math;
 import "../../../core/services/api_client.dart";
 import "../../../core/services/token_storage.dart";
 import "../../../core/widgets/app_logo.dart";
+import "../../../core/widgets/trial_banner.dart";
 import "../../achievements/screens/achievements_screen.dart";
 import "../../assessment/screens/assessment_screen.dart";
 import "../../auth/screens/login_screen.dart";
 import "../../breathing/screens/breathing_screen.dart";
 import "../../deep_checkin/screens/deep_checkin_screen.dart";
 import "../../history/screens/history_screen.dart";
+import "../../history/screens/evolution_screen.dart";
 import "../../patterns/screens/patterns_screen.dart";
 import "../../patterns/screens/recurring_patterns_screen.dart";
 import "../../reflection/screens/reflection_screen.dart";
@@ -26,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String name = "";
   bool loadingSummary = true;
   Map<String, dynamic>? latestAssessment;
+  int? trialDaysRemaining;
 
   @override
   void initState() {
@@ -42,11 +45,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> loadSummary() async {
     try {
-      final response = await ApiClient.get("/history", auth: true);
-      final items = response["items"] as List<dynamic>;
+      final results = await Future.wait([
+        ApiClient.get("/history", auth: true),
+        ApiClient.get("/me", auth: true),
+      ]);
+      final items = results[0]["items"] as List<dynamic>;
+      final me = results[1];
       if (!mounted) return;
+
+      int? daysLeft;
+      final trialEnd = me["trial_end"]?.toString();
+      final status = me["subscription_status"]?.toString();
+      if (status == "trial" && trialEnd != null) {
+        final end = DateTime.tryParse(trialEnd);
+        if (end != null) {
+          daysLeft = end.difference(DateTime.now()).inDays;
+          if (daysLeft! > 3) daysLeft = null; // só mostra banner com 3 dias ou menos
+        }
+      }
+
       setState(() {
         latestAssessment = items.isNotEmpty ? Map<String, dynamic>.from(items.first) : null;
+        trialDaysRemaining = daysLeft;
         loadingSummary = false;
       });
     } catch (_) {
@@ -86,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void openAssessment() => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentScreen())).then((_) => loadSummary());
   void openDeepCheckin() => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeepCheckinScreen()));
   void openHistory() => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen()));
+  void openEvolution() => Navigator.push(context, MaterialPageRoute(builder: (_) => const EvolutionScreen()));
   void openPatterns() => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatternsScreen()));
   void openRecurringPatterns() => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringPatternsScreen()));
   void openRitual() => Navigator.push(context, MaterialPageRoute(builder: (_) => const RitualScreen()));
@@ -112,6 +133,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
+              if (trialDaysRemaining != null) ...[
+                TrialBanner(daysRemaining: trialDaysRemaining!),
+                const SizedBox(height: 14),
+              ],
               Text("Olá, $name",
                 style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Color(0xFF1F2544))),
               const SizedBox(height: 4),
@@ -144,6 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _HomeAction(title: "Pausa", subtitle: "60 segundos", icon: Icons.air_rounded, color: const Color(0xFF42B8B0), onTap: openBreathing),
                     _HomeAction(title: "Conquistas", subtitle: "sequência", icon: Icons.emoji_events_rounded, color: const Color(0xFFF5B942), onTap: openAchievements),
                     _HomeAction(title: "Histórico", subtitle: "resultados", icon: Icons.history_rounded, color: const Color(0xFF2E236C), onTap: openHistory),
+                    _HomeAction(title: "Evolução", subtitle: "gráfico", icon: Icons.insights_rounded, color: const Color(0xFF59B36A), onTap: openEvolution),
                     _HomeAction(title: "Mapa", subtitle: "padrões", icon: Icons.account_tree_rounded, color: const Color(0xFF6B4FD8), onTap: openPatterns),
                     _HomeAction(title: "Recorrências", subtitle: "padrões", icon: Icons.repeat_rounded, color: const Color(0xFF42B8B0), onTap: openRecurringPatterns),
                   ];
@@ -170,31 +196,17 @@ class _HomeScreenState extends State<HomeScreen> {
 class _ArcScorePainter extends CustomPainter {
   final double value;
   final Color color;
-
   _ArcScorePainter({required this.value, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    const strokeWidth = 10.0;
+    const sw = 10.0;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-    const startAngle = math.pi * 0.75;
-    const sweepFull = math.pi * 1.5;
-
-    final bgPaint = Paint()
-      ..color = color.withOpacity(0.12)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final fgPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweepFull, false, bgPaint);
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweepFull * value, false, fgPaint);
+    final radius = (size.width - sw) / 2;
+    final bg = Paint()..color = color.withOpacity(0.12)..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.round;
+    final fg = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.round;
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), math.pi * 0.75, math.pi * 1.5, false, bg);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), math.pi * 0.75, math.pi * 1.5 * value, false, fg);
   }
 
   @override
@@ -219,8 +231,8 @@ class _TodayHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) {
       return Container(
-        height: 200,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(34)),
+        height: 180,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -230,25 +242,25 @@ class _TodayHeroCard extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: const LinearGradient(colors: [Color(0xFF6B4FD8), Color(0xFF42B8B0)]),
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: BorderRadius.circular(28),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 56, height: 56,
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
-              child: const Padding(padding: EdgeInsets.all(8), child: AppLogo(size: 40)),
+              width: 52, height: 52,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(18)),
+              child: const Padding(padding: EdgeInsets.all(8), child: AppLogo(size: 36)),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             const Text("Comece pelo seu momento de hoje",
-              style: TextStyle(fontSize: 24, height: 1.2, fontWeight: FontWeight.w700, color: Colors.white)),
+              style: TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w700, color: Colors.white)),
             const SizedBox(height: 8),
             const Text("Faça uma avaliação rápida e receba seu foco do dia.",
-              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.white70, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 22),
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.white70)),
+            const SizedBox(height: 20),
             SizedBox(
-              width: double.infinity, height: 50,
+              width: double.infinity, height: 48,
               child: FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFF6B4FD8)),
                 onPressed: onAssessment,
@@ -262,33 +274,31 @@ class _TodayHeroCard extends StatelessWidget {
 
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
       child: InkWell(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: color.withOpacity(0.12)),
           ),
           child: Row(
             children: [
               SizedBox(
-                width: 100, height: 100,
+                width: 96, height: 96,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
                     CustomPaint(painter: _ArcScorePainter(value: score! / 100, color: color)),
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("${score!}", style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700, color: color, height: 1)),
-                          Text("pts", style: TextStyle(fontSize: 11, color: color.withOpacity(0.6), fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                    ),
+                    Center(child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text("${score!}", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: color, height: 1)),
+                        Text("pts", style: TextStyle(fontSize: 10, color: color.withOpacity(0.6))),
+                      ],
+                    )),
                   ],
                 ),
               ),
@@ -300,10 +310,10 @@ class _TodayHeroCard extends StatelessWidget {
                     const Text("Seu momento", style: TextStyle(fontSize: 12, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
                     Text(scoreLabel, maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 20, height: 1.2, color: Color(0xFF1F2544), fontWeight: FontWeight.w700)),
+                      style: const TextStyle(fontSize: 19, height: 1.2, color: Color(0xFF1F2544), fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     Text("Foco: $focus", maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w400)),
+                      style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF6B6F8A))),
                     const SizedBox(height: 10),
                     Text("Abrir Hoje →", style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
                   ],
@@ -323,7 +333,6 @@ class _HomeAction {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-
   const _HomeAction({required this.title, required this.subtitle, required this.icon, required this.color, required this.onTap});
 }
 
@@ -335,30 +344,30 @@ class _HomeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         onTap: action.onTap,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(color: action.color.withOpacity(0.10)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 46, height: 46,
-                decoration: BoxDecoration(color: action.color.withOpacity(0.10), borderRadius: BorderRadius.circular(16)),
-                child: Icon(action.icon, color: action.color, size: 26),
+                width: 44, height: 44,
+                decoration: BoxDecoration(color: action.color.withOpacity(0.10), borderRadius: BorderRadius.circular(15)),
+                child: Icon(action.icon, color: action.color, size: 24),
               ),
               const Spacer(),
               Text(action.title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 15, height: 1.2, color: Color(0xFF1F2544), fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
+                style: const TextStyle(fontSize: 14, height: 1.2, color: Color(0xFF1F2544), fontWeight: FontWeight.w700)),
+              const SizedBox(height: 3),
               Text(action.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w400)),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF6B6F8A))),
             ],
           ),
         ),
@@ -381,7 +390,7 @@ class _SafetyMiniNote extends StatelessWidget {
       child: const Text(
         "O Vibra9 oferece orientações gerais de bem-estar e autoconhecimento. Não substitui acompanhamento profissional.",
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w400),
+        style: TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF6B6F8A)),
       ),
     );
   }

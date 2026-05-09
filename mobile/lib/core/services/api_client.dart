@@ -3,6 +3,13 @@ import "package:http/http.dart" as http;
 import "../config/api_config.dart";
 import "token_storage.dart";
 
+class EmailNotVerifiedException implements Exception {
+  final String message;
+  EmailNotVerifiedException(this.message);
+  @override
+  String toString() => "EmailNotVerifiedException: $message";
+}
+
 class ApiClient {
   static Future<Map<String, dynamic>> post(
     String path, {
@@ -112,6 +119,12 @@ class ApiClient {
       final detail = decoded["detail"];
       message = detail is String ? detail : detail.toString();
     }
+
+    // Detecta bloqueio por e-mail não verificado
+    if (response.statusCode == 403 && message == "EMAIL_NOT_VERIFIED") {
+      throw EmailNotVerifiedException("Verifique seu e-mail para continuar.");
+    }
+
     throw Exception(message);
   }
 }

@@ -88,15 +88,35 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 child: const Icon(Icons.mark_email_unread_rounded, color: Colors.white, size: 44),
               ),
               const SizedBox(height: 24),
-              const Text("Verifique seu e-mail", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
+              const Text("Verifique seu e-mail",
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Color(0xFF1F2544))),
               const SizedBox(height: 12),
               Text(
                 "Enviamos um código de 6 dígitos para\n${widget.email}",
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 15, height: 1.5, color: Color(0xFF6B6F8A)),
               ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8505B).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE8505B).withOpacity(0.25)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lock_outline_rounded, color: Color(0xFFE8505B), size: 18),
+                    SizedBox(width: 10),
+                    Expanded(child: Text(
+                      "A verificação é obrigatória. Sem ela, não é possível acessar avaliações, histórico e padrões.",
+                      style: TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF1F2544), fontWeight: FontWeight.w500))),
+                  ],
+                ),
+              ),
               if (widget.devCode != null) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -109,18 +129,19 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     children: [
                       const Icon(Icons.developer_mode_rounded, color: Color(0xFFF5B942), size: 18),
                       const SizedBox(width: 8),
-                      Text("DEV: ${widget.devCode}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1F2544))),
+                      Text("DEV: ${widget.devCode}",
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF1F2544))),
                     ],
                   ),
                 ),
               ],
-              const SizedBox(height: 36),
+              const SizedBox(height: 28),
               TextField(
                 controller: codeController,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 12, color: Color(0xFF1F2544)),
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: 12, color: Color(0xFF1F2544)),
                 decoration: InputDecoration(
                   counterText: "",
                   hintText: "000000",
@@ -154,24 +175,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   ),
                   child: loading
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("Verificar", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                      : const Text("Verificar", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: resending ? null : resend,
                 child: resending
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Text("Reenviar código"),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AppShellScreen()),
-                  (_) => false,
-                ),
-                child: const Text("Verificar depois", style: TextStyle(color: Color(0xFF6B6F8A))),
               ),
             ],
           ),

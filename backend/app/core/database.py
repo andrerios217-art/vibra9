@@ -2,10 +2,13 @@
 from app.core.config import DB_PATH
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=10000")
     return conn
 
 def init_db() -> None:
@@ -82,6 +85,13 @@ def init_db() -> None:
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY(assessment_id) REFERENCES assessments(id)
     )""")
+    # Índices para performance
+    c.execute("CREATE INDEX IF NOT EXISTS idx_assessments_user_id ON assessments(user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_assessments_created_at ON assessments(created_at)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_recommendations_assessment_id ON recommendations(assessment_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_recommendations_user_id ON recommendations(user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email)")
     _run_migrations(conn)
     conn.commit()
     conn.close()
