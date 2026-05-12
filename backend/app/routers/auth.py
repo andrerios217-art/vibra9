@@ -9,6 +9,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.models.schemas import RegisterRequest, LoginRequest, RefreshRequest
 from app.core.config import TRIAL_DAYS, REFRESH_TOKEN_EXPIRE_DAYS, ENVIRONMENT
 from app.core.dependencies import get_current_user
+from app.services.email_service import send_verification_email, send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 MAX_FAILED = 5
@@ -107,12 +108,13 @@ def register(payload: RegisterRequest):
     rt = create_refresh_token(uid)
     _store_refresh(uid, rt)
     code = _create_verification_code(uid, "email")
+    email_sent = send_verification_email(email, code, payload.name.strip())
     result = {
         "access_token": at, "refresh_token": rt, "token_type": "bearer",
         "user_id": uid, "name": payload.name.strip(), "email": email,
-        "email_verified": False,
+        "email_verified": False, "email_sent": email_sent,
     }
-    if ENVIRONMENT == "development":
+    if ENVIRONMENT == "development" or not email_sent:
         result["dev_code"] = code
         print(f"\n[DEV] Código de verificação para {email}: {code}\n")
     return result
@@ -222,8 +224,9 @@ def resend_verification(user: Dict[str, Any] = Depends(get_current_user)):
     if user.get("email_verified", 0):
         raise HTTPException(status_code=400, detail="E-mail já verificado.")
     code = _create_verification_code(user["id"], "email")
-    result = {"message": "Novo código enviado."}
-    if ENVIRONMENT == "development":
+    email_sent = send_verification_email(user["email"], code, user.get("name", ""))
+    result = {"message": "Novo código enviado.", "email_sent": email_sent}
+    if ENVIRONMENT == "development" or not email_sent:
         result["dev_code"] = code
         print(f"\n[DEV] Novo código para {user['email']}: {code}\n")
     return result
@@ -248,6 +251,7 @@ def forgot_password(payload: ForgotPasswordRequest):
                  (str(uuid.uuid4()), u["id"], token_hash, expires_at, datetime.now(timezone.utc).isoformat()))
     conn.commit()
     conn.close()
+    send_password_reset_email(email, raw_token, u.get("name", ""))
     result = {"message": generic_msg}
     if ENVIRONMENT == "development":
         result["dev_token"] = raw_token
@@ -279,5 +283,9 @@ def reset_password(payload: ResetPasswordRequest):
     conn.commit()
     conn.close()
     return {"message": "Senha redefinida com sucesso. Faça login novamente."}
+
+
+
+
 
 
