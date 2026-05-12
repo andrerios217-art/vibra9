@@ -1,9 +1,9 @@
-﻿import "package:flutter/material.dart";
+﻿import "dart:math" as math;
+import "package:flutter/material.dart";
 import "../../../core/services/api_client.dart";
 import "../../assessment/screens/assessment_screen.dart";
 import "../../breathing/screens/breathing_screen.dart";
 import "../../ritual/screens/ritual_screen.dart";
-import "../../result/screens/result_screen.dart";
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
@@ -24,29 +24,18 @@ class _TodayScreenState extends State<TodayScreen> {
 
   Future<void> loadLatest() async {
     try {
-      final response = await ApiClient.get(
-        "/history",
-        auth: true,
-      );
-
+      final response = await ApiClient.get("/history", auth: true);
       final items = response["items"] as List<dynamic>;
-
       if (!mounted) return;
-
       setState(() {
         latest = items.isNotEmpty ? Map<String, dynamic>.from(items.first) : null;
         loading = false;
       });
     } catch (error) {
       if (!mounted) return;
-
       setState(() => loading = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceAll("Exception: ", "")),
-        ),
-      );
+        SnackBar(content: Text(error.toString().replaceAll("Exception: ", ""))));
     }
   }
 
@@ -62,234 +51,225 @@ class _TodayScreenState extends State<TodayScreen> {
     return "Bom equilíbrio";
   }
 
-  String weakestDimensionLabel(Map<String, dynamic> item) {
+  Map<String, dynamic>? weakestDimension(Map<String, dynamic> item) {
     final dimensions = item["dimensions"] as List<dynamic>;
-
-    if (dimensions.isEmpty) return "Sua rotina";
-
-    final sorted = [...dimensions]..sort(
-        (a, b) => (a["score"] as int).compareTo(b["score"] as int),
-      );
-
-    return sorted.first["label"].toString();
+    if (dimensions.isEmpty) return null;
+    final sorted = [...dimensions]..sort((a, b) => (a["score"] as int).compareTo(b["score"] as int));
+    return Map<String, dynamic>.from(sorted.first);
   }
 
-  String strongestDimensionLabel(Map<String, dynamic> item) {
+  Map<String, dynamic>? strongestDimension(Map<String, dynamic> item) {
     final dimensions = item["dimensions"] as List<dynamic>;
-
-    if (dimensions.isEmpty) return "Seu autocuidado";
-
-    final sorted = [...dimensions]..sort(
-        (a, b) => (b["score"] as int).compareTo(a["score"] as int),
-      );
-
-    return sorted.first["label"].toString();
+    if (dimensions.isEmpty) return null;
+    final sorted = [...dimensions]..sort((a, b) => (b["score"] as int).compareTo(a["score"] as int));
+    return Map<String, dynamic>.from(sorted.first);
   }
 
   Future<void> openAssessment() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AssessmentScreen()),
-    );
-
-    if (mounted) {
-      loadLatest();
-    }
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessmentScreen()));
+    if (mounted) loadLatest();
   }
 
   void openBreathing() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const BreathingScreen()),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const BreathingScreen()));
   }
 
   void openRitual() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const RitualScreen()),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const RitualScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final hasResult = latest != null;
     final score = hasResult ? latest!["general_score"] as int : 0;
     final color = hasResult ? scoreColor(score) : const Color(0xFF6B4FD8);
+    final weakest = hasResult ? weakestDimension(latest!) : null;
+    final strongest = hasResult ? strongestDimension(latest!) : null;
+    final hasStrongDimension = strongest != null && (strongest["score"] as int) >= 7;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F5FF),
-      appBar: AppBar(
-        title: const Text("Hoje"),
-      ),
+      appBar: AppBar(title: const Text("Hoje")),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(22),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(26),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(34),
-                border: Border.all(
-                  color: color.withOpacity(0.14),
+        child: RefreshIndicator(
+          onRefresh: loadLatest,
+          child: ListView(
+            padding: const EdgeInsets.all(22),
+            children: [
+              if (hasResult) ...[
+                _ScoreCard(
+                  score: score,
+                  color: color,
+                  label: scoreLabel(score),
+                  focus: weakest?["label"]?.toString() ?? "Sua rotina",
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.08),
-                    blurRadius: 28,
-                    offset: const Offset(0, 14),
-                  ),
-                ],
+              ] else ...[
+                _EmptyHero(onAssessment: openAssessment),
+              ],
+              const SizedBox(height: 18),
+              if (hasStrongDimension)
+                _InsightCard(
+                  icon: Icons.bolt_rounded,
+                  title: "Força atual",
+                  text: strongest!["label"].toString(),
+                  color: const Color(0xFF59B36A),
+                ),
+              if (hasStrongDimension) const SizedBox(height: 12),
+              _TodayActionCard(
+                title: "Ritual do dia",
+                text: "Transforme seu resultado em pequenas ações concluídas.",
+                icon: Icons.checklist_rounded,
+                color: const Color(0xFF6B4FD8),
+                onTap: openRitual,
               ),
-              child: hasResult
-                  ? Row(
-                      children: [
-                        SizedBox(
-                          width: 110,
-                          height: 110,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              CircularProgressIndicator(
-                                value: score / 100,
-                                strokeWidth: 10,
-                                backgroundColor: color.withOpacity(0.10),
-                                valueColor: AlwaysStoppedAnimation<Color>(color),
-                              ),
-                              Center(
-                                child: Text(
-                                  "$score",
-                                  style: TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w900,
-                                    color: color,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 22),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "Seu momento",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF6B6F8A),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                scoreLabel(score),
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  color: Color(0xFF1F2544),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Foco sugerido: ${weakestDimensionLabel(latest!)}",
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  height: 1.35,
-                                  color: Color(0xFF6B6F8A),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        const Icon(
-                          Icons.wb_sunny_rounded,
-                          size: 58,
-                          color: Color(0xFF6B4FD8),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "Comece seu check-up",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1F2544),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Faça uma avaliação rápida para receber seu foco e ações práticas de hoje.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.45,
-                            color: Color(0xFF6B6F8A),
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 54,
-                          child: FilledButton(
-                            onPressed: openAssessment,
-                            child: const Text(
-                              "Fazer avaliação",
-                              style: TextStyle(fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-            const SizedBox(height: 20),
-            if (hasResult)
-              _InsightCard(
-                icon: Icons.bolt_rounded,
-                title: "Força atual",
-                text: strongestDimensionLabel(latest!),
-                color: const Color(0xFF59B36A),
+              const SizedBox(height: 12),
+              _TodayActionCard(
+                title: "Pausa guiada",
+                text: "Respiração simples de 60 segundos para reduzir ruído.",
+                icon: Icons.air_rounded,
+                color: const Color(0xFF42B8B0),
+                onTap: openBreathing,
               ),
-            if (hasResult) const SizedBox(height: 12),
-            _TodayActionCard(
-              title: "Ritual do dia",
-              text: "Transforme seu resultado em pequenas ações concluídas.",
-              icon: Icons.checklist_rounded,
-              color: const Color(0xFF6B4FD8),
-              onTap: openRitual,
-            ),
-            const SizedBox(height: 12),
-            _TodayActionCard(
-              title: "Pausa guiada",
-              text: "Respiração simples de 60 segundos para reduzir ruído.",
-              icon: Icons.air_rounded,
-              color: const Color(0xFF42B8B0),
-              onTap: openBreathing,
-            ),
-            const SizedBox(height: 12),
-            _TodayActionCard(
-              title: "Nova avaliação",
-              text: "Atualize seu momento e gere um novo resultado.",
-              icon: Icons.favorite_rounded,
-              color: const Color(0xFFF5B942),
-              onTap: openAssessment,
-            ),
-            const SizedBox(height: 18),
-            const _ResponsibleNote(),
-          ],
+              const SizedBox(height: 12),
+              _TodayActionCard(
+                title: "Nova avaliação",
+                text: "Atualize seu momento e gere um novo resultado.",
+                icon: Icons.favorite_rounded,
+                color: const Color(0xFFF5B942),
+                onTap: openAssessment,
+              ),
+              const SizedBox(height: 18),
+              const _ResponsibleNote(),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _ArcPainter extends CustomPainter {
+  final double value;
+  final Color color;
+  _ArcPainter({required this.value, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const sw = 11.0;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - sw) / 2;
+    final bg = Paint()..color = color.withOpacity(0.12)..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.round;
+    final fg = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.round;
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), math.pi * 0.75, math.pi * 1.5, false, bg);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), math.pi * 0.75, math.pi * 1.5 * value, false, fg);
+  }
+
+  @override
+  bool shouldRepaint(_ArcPainter old) => old.value != value || old.color != color;
+}
+
+class _ScoreCard extends StatelessWidget {
+  final int score;
+  final Color color;
+  final String label;
+  final String focus;
+  const _ScoreCard({required this.score, required this.color, required this.label, required this.focus});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withOpacity(0.14)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 100, height: 100,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CustomPaint(painter: _ArcPainter(value: score / 100, color: color)),
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text("$score", style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700, color: color, height: 1)),
+                      Text("pts", style: TextStyle(fontSize: 11, color: color.withOpacity(0.6))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Seu momento",
+                  style: TextStyle(fontSize: 12, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Text(label,
+                  style: const TextStyle(fontSize: 20, color: Color(0xFF1F2544), fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text("Foco: $focus",
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF6B6F8A))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyHero extends StatelessWidget {
+  final VoidCallback onAssessment;
+  const _EmptyHero({required this.onAssessment});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFF6B4FD8), Color(0xFF42B8B0)]),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.wb_sunny_rounded, size: 48, color: Colors.white),
+          const SizedBox(height: 14),
+          const Text("Comece seu check-up",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white)),
+          const SizedBox(height: 6),
+          const Text(
+            "Faça uma avaliação rápida para receber seu foco e ações práticas de hoje.",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, height: 1.5, color: Colors.white70),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity, height: 48,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF6B4FD8),
+              ),
+              onPressed: onAssessment,
+              child: const Text("Fazer avaliação",
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -311,47 +291,32 @@ class _InsightCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: color.withOpacity(0.12),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.12)),
       ),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 44, height: 44,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(19),
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: color),
+            child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B6F8A),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  text,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    color: Color(0xFF1F2544),
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                Text(title,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
+                Text(text,
+                  style: const TextStyle(fontSize: 16, color: Color(0xFF1F2544), fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -380,62 +345,40 @@ class _TodayActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: color.withOpacity(0.10),
-            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withOpacity(0.10)),
           ),
           child: Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 48, height: 48,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
+                  color: color.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 30,
-                ),
+                child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF1F2544),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      text,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.35,
-                        color: Color(0xFF6B6F8A),
-                      ),
-                    ),
+                    Text(title,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1F2544))),
+                    const SizedBox(height: 3),
+                    Text(text,
+                      style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF6B6F8A))),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF6B6F8A),
-              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B6F8A), size: 22),
             ],
           ),
         ),
@@ -450,22 +393,16 @@ class _ResponsibleNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF6B4FD8).withOpacity(0.07),
-        borderRadius: BorderRadius.circular(22),
+        color: const Color(0xFF6B4FD8).withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: const Text(
         "O Vibra9 oferece orientações gerais de bem-estar e autoconhecimento. Não substitui acompanhamento profissional.",
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 12,
-          height: 1.4,
-          color: Color(0xFF6B6F8A),
-          fontWeight: FontWeight.w600,
-        ),
+        style: TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF6B6F8A), fontWeight: FontWeight.w500),
       ),
     );
   }
 }
-

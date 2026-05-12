@@ -25,6 +25,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool termsOpened = false;
   bool termsAccepted = false;
 
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> openPrivacyPolicy() async {
     final result = await Navigator.push<bool>(
       context,
@@ -47,6 +55,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
+  bool _isPasswordValid(String password) {
+    if (password.length < 8) return false;
+    final hasLetter = RegExp(r"[A-Za-z]").hasMatch(password);
+    final hasDigit = RegExp(r"\d").hasMatch(password);
+    return hasLetter && hasDigit;
+  }
+
   Future<void> register() async {
     if (!privacyAccepted || !termsAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,15 +70,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     final name = nameController.text.trim();
     final email = emailController.text.trim();
-    final password = passwordController.text.trim();
+    final password = passwordController.text;
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Preencha todos os campos.")));
       return;
     }
-    if (password.length < 8) {
+    if (!_isPasswordValid(password)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("A senha deve ter pelo menos 8 caracteres.")));
+        const SnackBar(content: Text("A senha precisa ter ao menos 8 caracteres, com letra e número.")));
       return;
     }
     setState(() => loading = true);
@@ -78,8 +93,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await TokenStorage.saveSession(
         token: response["access_token"],
         refreshToken: response["refresh_token"] ?? "",
-        name: response["name"],
-        email: response["email"],
+        name: response["name"] ?? "",
+        email: response["email"] ?? "",
       );
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -109,17 +124,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const SizedBox(height: 20),
-              const Text("Comece sua avaliação", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
+              const SizedBox(height: 16),
+              const Text("Bem-vindo ao Vibra9",
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Color(0xFF1F2544))),
               const SizedBox(height: 8),
-              const Text("Crie sua conta para salvar seu histórico.", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Color(0xFF6B6F8A))),
-              const SizedBox(height: 30),
+              const Text(
+                "Crie sua conta para começar sua jornada de bem-estar.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, color: Color(0xFF6B6F8A)),
+              ),
+              const SizedBox(height: 28),
               AppInput(controller: nameController, label: "Nome", icon: Icons.person_outline),
               const SizedBox(height: 14),
-              AppInput(controller: emailController, label: "E-mail", icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+              AppInput(controller: emailController, label: "E-mail", icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 14),
-              AppInput(controller: passwordController, label: "Senha (mínimo 8 caracteres)", icon: Icons.lock_outline, obscureText: true),
-              const SizedBox(height: 28),
+              AppInput(
+                controller: passwordController,
+                label: "Senha",
+                icon: Icons.lock_outline,
+                obscureText: true,
+              ),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  "Mínimo 8 caracteres, com pelo menos uma letra e um número.",
+                  style: TextStyle(fontSize: 12, color: Color(0xFF6B6F8A)),
+                ),
+              ),
+              const SizedBox(height: 24),
               _ConsentTile(
                 label: "Política de Privacidade",
                 description: "Leia o documento para liberar o aceite.",
@@ -141,7 +175,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onOpen: openTerms,
                 onToggle: termsOpened ? (v) => setState(() => termsAccepted = v) : null,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               AppButton(text: "Criar conta", loading: loading, onPressed: register),
             ],
           ),
@@ -180,15 +214,13 @@ class _ConsentTile extends StatelessWidget {
             ? color.withOpacity(0.2)
             : const Color(0xFFE0E0E0);
 
-    final Color bgColor = accepted
-        ? color.withOpacity(0.06)
-        : Colors.white;
+    final Color bgColor = accepted ? color.withOpacity(0.06) : Colors.white;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -205,7 +237,7 @@ class _ConsentTile extends StatelessWidget {
                     children: [
                       Text(label, style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: opened ? color : Colors.grey.shade500,
                       )),
                       const SizedBox(height: 3),
@@ -218,7 +250,7 @@ class _ConsentTile extends StatelessWidget {
                               : opened
                                   ? const Color(0xFF6B6F8A)
                                   : Colors.grey.shade400,
-                          fontWeight: accepted ? FontWeight.w700 : FontWeight.w400,
+                          fontWeight: accepted ? FontWeight.w600 : FontWeight.w400,
                         ),
                       ),
                     ],
@@ -241,8 +273,8 @@ class _ConsentTile extends StatelessWidget {
           InkWell(
             onTap: onOpen,
             borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(18),
-              bottomRight: Radius.circular(18),
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(16),
             ),
             child: Container(
               width: double.infinity,
@@ -252,8 +284,8 @@ class _ConsentTile extends StatelessWidget {
                     ? color.withOpacity(0.07)
                     : const Color(0xFF6B4FD8).withOpacity(0.04),
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
                 ),
                 border: Border(top: BorderSide(color: borderColor)),
               ),
@@ -270,7 +302,7 @@ class _ConsentTile extends StatelessWidget {
                     opened ? "Ler novamente" : "Ler documento — obrigatório",
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: opened ? color : Colors.grey.shade400,
                     ),
                   ),

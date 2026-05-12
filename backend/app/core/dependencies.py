@@ -5,6 +5,7 @@ from fastapi import HTTPException, Header
 from app.core.database import get_connection
 from app.core.security import decode_token
 
+
 async def get_current_user(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     if not authorization:
         raise HTTPException(status_code=401, detail="Token ausente.")
@@ -21,21 +22,30 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
         raise HTTPException(status_code=401, detail="Usuário não encontrado.")
     return dict(user)
 
+
 def check_email_verified(user: Dict[str, Any]) -> None:
-    """Bloqueia acesso a funcionalidades se e-mail não foi verificado."""
+    """Bloqueia acesso se o e-mail não foi verificado."""
     if not user.get("email_verified"):
         raise HTTPException(
             status_code=403,
             detail="EMAIL_NOT_VERIFIED",
         )
 
+
 def check_subscription(user: Dict[str, Any]) -> None:
-    """Verifica e-mail + status de assinatura/trial."""
+    """Verifica e-mail + status de assinatura/trial.
+
+    Códigos de erro distintos para o Flutter tratar cada caso:
+    - 403 EMAIL_NOT_VERIFIED  → e-mail não verificado
+    - 402 TRIAL_EXPIRED        → trial acabou, precisa assinar
+    - 402 SUBSCRIPTION_INACTIVE → status diferente de active/trial
+    """
     check_email_verified(user)
 
     status = user.get("subscription_status", "trial")
     if status == "active":
         return
+
     if status == "trial":
         trial_end_str = user.get("trial_end")
         if trial_end_str:
@@ -47,7 +57,12 @@ def check_subscription(user: Dict[str, Any]) -> None:
                     return
             except (ValueError, TypeError):
                 pass
+        raise HTTPException(
+            status_code=402,
+            detail="TRIAL_EXPIRED",
+        )
+
     raise HTTPException(
         status_code=402,
-        detail="Trial expirado ou assinatura inativa. Ative o plano mensal para continuar.",
+        detail="SUBSCRIPTION_INACTIVE",
     )

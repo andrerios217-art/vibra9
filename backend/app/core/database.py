@@ -21,8 +21,10 @@ def init_db() -> None:
         password_hash TEXT NOT NULL,
         privacy_policy_accepted INTEGER NOT NULL DEFAULT 0,
         privacy_policy_accepted_at TEXT,
+        privacy_policy_version TEXT,
         terms_accepted INTEGER NOT NULL DEFAULT 0,
         terms_accepted_at TEXT,
+        terms_version TEXT,
         email_verified INTEGER NOT NULL DEFAULT 0,
         subscription_status TEXT NOT NULL DEFAULT 'trial',
         trial_start TEXT,
@@ -63,6 +65,14 @@ def init_db() -> None:
         created_at TEXT NOT NULL,
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS consent_log (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        privacy_policy_version TEXT NOT NULL,
+        terms_version TEXT NOT NULL,
+        accepted_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )""")
     c.execute("""CREATE TABLE IF NOT EXISTS assessments (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -85,13 +95,13 @@ def init_db() -> None:
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY(assessment_id) REFERENCES assessments(id)
     )""")
-    # Índices para performance
     c.execute("CREATE INDEX IF NOT EXISTS idx_assessments_user_id ON assessments(user_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_assessments_created_at ON assessments(created_at)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_recommendations_assessment_id ON recommendations(assessment_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_recommendations_user_id ON recommendations(user_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_consent_log_user_id ON consent_log(user_id)")
     _run_migrations(conn)
     conn.commit()
     conn.close()
@@ -100,7 +110,9 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     existing = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
     cols = {
         "privacy_policy_accepted_at": "ALTER TABLE users ADD COLUMN privacy_policy_accepted_at TEXT",
+        "privacy_policy_version": "ALTER TABLE users ADD COLUMN privacy_policy_version TEXT",
         "terms_accepted_at": "ALTER TABLE users ADD COLUMN terms_accepted_at TEXT",
+        "terms_version": "ALTER TABLE users ADD COLUMN terms_version TEXT",
         "email_verified": "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
         "subscription_status": "ALTER TABLE users ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'trial'",
         "trial_start": "ALTER TABLE users ADD COLUMN trial_start TEXT",

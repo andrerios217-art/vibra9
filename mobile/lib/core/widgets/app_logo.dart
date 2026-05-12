@@ -20,15 +20,31 @@ class AppLogo extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            // Fallback: ícone caso a imagem não carregue
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6B4FD8).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(size * 0.25),
+              ),
+              child: Icon(
+                Icons.spa_rounded,
+                size: size * 0.55,
+                color: const Color(0xFF6B4FD8),
+              ),
+            );
+          },
         ),
         if (showText) ...[
           const SizedBox(height: 8),
-          const Text(
+          Text(
             "Vibra9",
             style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF1F2544),
+              fontSize: size * 0.32,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1F2544),
             ),
           ),
         ],

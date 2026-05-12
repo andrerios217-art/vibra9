@@ -12,7 +12,8 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
   final controller = TextEditingController();
 
   bool loading = true;
-  bool saved = false;
+  bool isDirty = false;
+  bool hasSavedContent = false;
 
   @override
   void initState() {
@@ -20,39 +21,45 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
     loadReflection();
   }
 
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   String todayKey() {
     final now = DateTime.now();
     final y = now.year.toString();
     final m = now.month.toString().padLeft(2, "0");
     final d = now.day.toString().padLeft(2, "0");
-
     return "reflection_$y$m$d";
   }
 
   Future<void> loadReflection() async {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString(todayKey()) ?? "";
-
     if (!mounted) return;
-
     setState(() {
       controller.text = value;
       loading = false;
-      saved = value.trim().isNotEmpty;
+      isDirty = false;
+      hasSavedContent = value.trim().isNotEmpty;
     });
   }
 
   Future<void> saveReflection() async {
+    final text = controller.text.trim();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(todayKey(), controller.text.trim());
-
+    await prefs.setString(todayKey(), text);
     if (!mounted) return;
-
-    setState(() => saved = controller.text.trim().isNotEmpty);
-
+    setState(() {
+      isDirty = false;
+      hasSavedContent = text.isNotEmpty;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("Reflexão salva."),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -63,15 +70,14 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text("Limpar reflexão?"),
-          content: const Text(
-            "Isso vai apagar sua reflexão de hoje neste dispositivo.",
-          ),
+          content: const Text("Isso vai apagar sua reflexão de hoje neste dispositivo. Esta ação não pode ser desfeita."),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: const Text("Cancelar"),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE8505B)),
               onPressed: () => Navigator.pop(context, true),
               child: const Text("Limpar"),
             ),
@@ -79,31 +85,33 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
         );
       },
     );
-
     if (confirmed != true) return;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(todayKey());
-
     controller.clear();
-
     if (!mounted) return;
-
-    setState(() => saved = false);
+    setState(() {
+      isDirty = false;
+      hasSavedContent = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final canSave = isDirty || (controller.text.trim().isNotEmpty && !hasSavedContent);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F5FF),
       appBar: AppBar(
         title: const Text("Reflexão do dia"),
         actions: [
-          IconButton(
-            tooltip: "Limpar",
-            onPressed: clearReflection,
-            icon: const Icon(Icons.delete_outline_rounded),
-          ),
+          if (hasSavedContent)
+            IconButton(
+              tooltip: "Limpar",
+              onPressed: clearReflection,
+              icon: const Icon(Icons.delete_outline_rounded),
+            ),
         ],
       ),
       body: SafeArea(
@@ -113,60 +121,38 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
                 padding: const EdgeInsets.all(22),
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(26),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(34),
-                      border: Border.all(
-                        color: const Color(0xFF6B4FD8).withOpacity(0.12),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6B4FD8).withOpacity(0.08),
-                          blurRadius: 28,
-                          offset: const Offset(0, 14),
-                        ),
-                      ],
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0xFF6B4FD8).withOpacity(0.10)),
                     ),
                     child: Column(
                       children: [
                         Container(
-                          width: 84,
-                          height: 84,
+                          width: 76, height: 76,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF6B4FD8).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(28),
+                            color: const Color(0xFF6B4FD8).withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(24),
                           ),
-                          child: const Icon(
-                            Icons.edit_note_rounded,
-                            color: Color(0xFF6B4FD8),
-                            size: 50,
-                          ),
+                          child: const Icon(Icons.edit_note_rounded, color: Color(0xFF6B4FD8), size: 44),
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
                         const Text(
                           "Escreva para organizar",
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 25,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1F2544),
-                          ),
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1F2544)),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         const Text(
                           "Uma reflexão curta ajuda a perceber padrões sem transformar tudo em problema.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.45,
-                            color: Color(0xFF6B6F8A),
-                          ),
+                          style: TextStyle(fontSize: 14, height: 1.5, color: Color(0xFF6B6F8A)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   const _PromptCard(
                     title: "Perguntas-guia",
                     questions: [
@@ -175,58 +161,51 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
                       "O que eu preciso aceitar sem me cobrar tanto?",
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: controller,
                     minLines: 9,
                     maxLines: 14,
                     textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
-                      hintText:
-                          "Escreva livremente. Exemplo: Hoje percebi que...",
+                      hintText: "Escreva livremente. Exemplo: Hoje percebi que...",
                       alignLabelWithHint: true,
                       labelText: "Minha reflexão",
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(26),
+                        borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide.none,
                       ),
                     ),
                     onChanged: (_) {
-                      if (saved) {
-                        setState(() => saved = false);
+                      if (!isDirty) {
+                        setState(() => isDirty = true);
                       }
                     },
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
                   SizedBox(
-                    height: 56,
+                    height: 50,
                     child: FilledButton.icon(
-                      onPressed: saveReflection,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF6B4FD8),
+                      ),
+                      onPressed: canSave ? saveReflection : null,
                       icon: Icon(
-                        saved
-                            ? Icons.check_circle_rounded
-                            : Icons.save_rounded,
+                        canSave ? Icons.save_rounded : Icons.check_circle_rounded,
                       ),
                       label: Text(
-                        saved ? "Salvo" : "Salvar reflexão",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
+                        canSave ? "Salvar reflexão" : "Salvo",
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   const Text(
-                    "Esta reflexão fica salva localmente neste dispositivo. Em uma versão futura, ela pode ser sincronizada com sua conta mediante consentimento.",
+                    "Esta reflexão fica salva localmente neste dispositivo. Em uma versão futura, ela poderá ser sincronizada com sua conta mediante consentimento.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.4,
-                      color: Color(0xFF6B6F8A),
-                    ),
+                    style: TextStyle(fontSize: 11, height: 1.5, color: Color(0xFF6B6F8A)),
                   ),
                 ],
               ),
@@ -239,66 +218,41 @@ class _PromptCard extends StatelessWidget {
   final String title;
   final List<String> questions;
 
-  const _PromptCard({
-    required this.title,
-    required this.questions,
-  });
+  const _PromptCard({required this.title, required this.questions});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFFFFBF7),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: const Color(0xFFF5B942).withOpacity(0.20),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF5B942).withOpacity(0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.lightbulb_outline_rounded,
-                color: Color(0xFFF5B942),
-              ),
+              const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFF5B942), size: 20),
               const SizedBox(width: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1F2544),
-                ),
-              ),
+              Text(title,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1F2544))),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           ...questions.map(
             (question) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "• ",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFFF5B942),
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+                  const Text("• ",
+                    style: TextStyle(fontSize: 14, color: Color(0xFFF5B942), fontWeight: FontWeight.w700)),
                   Expanded(
                     child: Text(
                       question,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.35,
-                        color: Color(0xFF1F2544),
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontSize: 13, height: 1.5, color: Color(0xFF1F2544), fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -310,4 +264,3 @@ class _PromptCard extends StatelessWidget {
     );
   }
 }
-

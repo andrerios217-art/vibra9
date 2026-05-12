@@ -1,4 +1,5 @@
 ﻿import "dart:async";
+import "dart:math" as math;
 import "package:flutter/material.dart";
 
 class BreathingScreen extends StatefulWidget {
@@ -16,18 +17,20 @@ class _BreathingScreenState extends State<BreathingScreen>
   int secondsLeft = 60;
   bool running = false;
 
+  // Ciclo de respiração: 4s inspirar + 4s soltar = 8s total
+  static const int cycleSeconds = 8;
+  static const int totalSeconds = 60;
+
   @override
   void initState() {
     super.initState();
-
     controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
       lowerBound: 0.72,
       upperBound: 1.0,
     );
-
-    controller.repeat(reverse: true);
+    // Não roda automaticamente — só anima durante a sessão
   }
 
   @override
@@ -39,18 +42,18 @@ class _BreathingScreenState extends State<BreathingScreen>
 
   void start() {
     if (running) return;
-
     setState(() => running = true);
+    controller.repeat(reverse: true);
 
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (secondsLeft <= 1) {
-        timer.cancel();
-
+        t.cancel();
+        controller.stop();
+        controller.value = 0.72;
         setState(() {
           secondsLeft = 0;
           running = false;
         });
-
         showFinishedDialog();
       } else {
         setState(() => secondsLeft--);
@@ -60,32 +63,50 @@ class _BreathingScreenState extends State<BreathingScreen>
 
   void pause() {
     timer?.cancel();
-
+    controller.stop();
     setState(() => running = false);
   }
 
   void reset() {
     timer?.cancel();
-
+    controller.stop();
+    controller.value = 0.72;
     setState(() {
-      secondsLeft = 60;
+      secondsLeft = totalSeconds;
       running = false;
     });
   }
 
   String instruction() {
-    final phase = secondsLeft % 8;
+    if (!running) return "Pronto?";
+    // Calcula em qual fase do ciclo estamos baseado no tempo decorrido
+    final elapsed = totalSeconds - secondsLeft;
+    final phase = elapsed % cycleSeconds;
+    return phase < 4 ? "Inspire" : "Solte o ar";
+  }
 
-    if (phase >= 4) {
-      return "Solte o ar";
-    }
-
-    return "Inspire";
+  Future<bool> _confirmExit() async {
+    if (!running) return true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Sair da pausa?"),
+        content: const Text("Sua respiração será interrompida."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Continuar")),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE8505B)),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Sair"),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
   }
 
   void showFinishedDialog() {
     if (!mounted) return;
-
     showDialog<void>(
       context: context,
       builder: (context) {
@@ -110,148 +131,149 @@ class _BreathingScreenState extends State<BreathingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final progress = secondsLeft / 60;
+    final progress = secondsLeft / totalSeconds;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F5FF),
-      appBar: AppBar(
-        title: const Text("Pausa guiada"),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const SizedBox(height: 18),
-              const Text(
-                "Respiração de 60 segundos",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1F2544),
+    return PopScope(
+      canPop: !running,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _confirmExit()) {
+          pause();
+          if (mounted) Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F5FF),
+        appBar: AppBar(
+          title: const Text("Pausa guiada"),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () async {
+              if (await _confirmExit()) {
+                pause();
+                if (mounted) Navigator.pop(context);
+              }
+            },
+          ),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                const Text(
+                  "Respiração de 60 segundos",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2544),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Uma pausa simples para reduzir o ruído e voltar ao presente.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.45,
-                  color: Color(0xFF6B6F8A),
+                const SizedBox(height: 6),
+                const Text(
+                  "Uma pausa simples para reduzir o ruído e voltar ao presente.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, height: 1.5, color: Color(0xFF6B6F8A)),
                 ),
-              ),
-              const Spacer(),
-              AnimatedBuilder(
-                animation: controller,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: controller.value,
-                    child: Container(
-                      width: 230,
-                      height: 230,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF6B4FD8),
-                            Color(0xFF42B8B0),
-                          ],
+                const Spacer(),
+                AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: running ? controller.value : 0.85,
+                      child: Container(
+                        width: 220, height: 220,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF6B4FD8), Color(0xFF42B8B0)],
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6B4FD8).withOpacity(0.22),
-                            blurRadius: 42,
-                            offset: const Offset(0, 20),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 168,
-                          height: 168,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.18),
-                          ),
-                          child: Center(
-                            child: Text(
-                              instruction(),
-                              style: const TextStyle(
-                                fontSize: 30,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
+                        child: Center(
+                          child: Container(
+                            width: 160, height: 160,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.18),
+                            ),
+                            child: Center(
+                              child: Text(
+                                instruction(),
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 36),
-              SizedBox(
-                width: 150,
-                height: 150,
-                child: Stack(
-                  fit: StackFit.expand,
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: 130, height: 130,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CustomPaint(
+                        painter: _ArcPainter(
+                          value: progress,
+                          color: const Color(0xFF6B4FD8),
+                        ),
+                      ),
+                      Center(
+                        child: Text(
+                          "${secondsLeft}s",
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1F2544),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Row(
                   children: [
-                    CircularProgressIndicator(
-                      value: progress,
-                      strokeWidth: 10,
-                      backgroundColor: const Color(0xFF6B4FD8).withOpacity(0.10),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color(0xFF6B4FD8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: reset,
+                          child: const Text(
+                            "Reiniciar",
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ),
                     ),
-                    Center(
-                      child: Text(
-                        "${secondsLeft}s",
-                        style: const TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF1F2544),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF6B4FD8),
+                          ),
+                          onPressed: running ? pause : start,
+                          child: Text(
+                            running ? "Pausar" : "Iniciar",
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 56,
-                      child: OutlinedButton(
-                        onPressed: reset,
-                        child: const Text(
-                          "Reiniciar",
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: running ? pause : start,
-                        child: Text(
-                          running ? "Pausar" : "Iniciar",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -259,3 +281,22 @@ class _BreathingScreenState extends State<BreathingScreen>
   }
 }
 
+class _ArcPainter extends CustomPainter {
+  final double value;
+  final Color color;
+  _ArcPainter({required this.value, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const sw = 10.0;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - sw) / 2;
+    final bg = Paint()..color = color.withOpacity(0.12)..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.round;
+    final fg = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.round;
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), math.pi * 0.75, math.pi * 1.5, false, bg);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), math.pi * 0.75, math.pi * 1.5 * value, false, fg);
+  }
+
+  @override
+  bool shouldRepaint(_ArcPainter old) => old.value != value || old.color != color;
+}

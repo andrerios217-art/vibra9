@@ -55,11 +55,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (trialEnd != null) {
         final end = DateTime.tryParse(trialEnd!);
         if (end != null) {
-          final days = end.difference(DateTime.now()).inDays;
-          if (days >= 0) return "Trial — $days dias restantes";
+          final hours = end.difference(DateTime.now()).inHours;
+          if (hours < 0) return "Trial expirado";
+          if (hours < 24) return "Trial — menos de 1 dia restante";
+          final days = (hours / 24).floor();
+          return "Trial — $days ${days == 1 ? 'dia' : 'dias'} restantes";
         }
       }
-      return "Trial";
+      return "Trial ativo";
     }
     return "Assinatura inativa";
   }
@@ -81,28 +84,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> confirmDeleteAccount() async {
-    final confirmed = await showDialog<bool>(
+    final passwordController = TextEditingController();
+    String? errorText;
+
+    final confirmed = await showDialog<String?>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Excluir conta?"),
-        content: const Text("Essa ação removerá sua conta, avaliações e recomendações salvas. Não será possível desfazer."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancelar")),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE8505B)),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Excluir"),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Excluir conta?"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Essa ação removerá sua conta, avaliações, recomendações e consentimentos. Não será possível desfazer.",
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Digite sua senha para confirmar:",
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1F2544)),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: "Senha",
+                  errorText: errorText,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text("Cancelar"),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE8505B)),
+              onPressed: () {
+                if (passwordController.text.isEmpty) {
+                  setDialogState(() => errorText = "Digite sua senha.");
+                  return;
+                }
+                Navigator.pop(context, passwordController.text);
+              },
+              child: const Text("Excluir"),
+            ),
+          ],
+        ),
       ),
     );
-    if (confirmed == true) await deleteAccount();
+
+    if (confirmed != null && confirmed.isNotEmpty) {
+      await deleteAccount(confirmed);
+    }
   }
 
-  Future<void> deleteAccount() async {
+  Future<void> deleteAccount(String password) async {
     setState(() => deleting = true);
     try {
-      await ApiClient.delete("/me", auth: true);
+      await ApiClient.delete("/me", auth: true, body: {"password": password});
       await TokenStorage.clear();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -133,31 +179,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: const Color(0xFF6B4FD8).withOpacity(0.12)),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFF6B4FD8).withOpacity(0.10)),
                     ),
                     child: Column(
                       children: [
                         Container(
-                          width: 82, height: 82,
+                          width: 78, height: 78,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF6B4FD8).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(28),
+                            color: const Color(0xFF6B4FD8).withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(24),
                           ),
-                          child: const Icon(Icons.person_rounded, size: 46, color: Color(0xFF6B4FD8)),
+                          child: const Icon(Icons.person_rounded, size: 42, color: Color(0xFF6B4FD8)),
                         ),
-                        const SizedBox(height: 16),
-                        Text(name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1F2544))),
-                        const SizedBox(height: 4),
-                        Text(email, style: const TextStyle(fontSize: 15, color: Color(0xFF6B6F8A))),
                         const SizedBox(height: 14),
+                        Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1F2544))),
+                        const SizedBox(height: 4),
+                        Text(email, style: const TextStyle(fontSize: 14, color: Color(0xFF6B6F8A))),
+                        const SizedBox(height: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                           decoration: BoxDecoration(
                             color: subscriptionColor.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Text(subscriptionLabel, style: TextStyle(fontWeight: FontWeight.w800, color: subscriptionColor)),
+                          child: Text(subscriptionLabel,
+                            style: TextStyle(fontWeight: FontWeight.w700, color: subscriptionColor, fontSize: 13)),
                         ),
                       ],
                     ),
@@ -172,7 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _ProfileTile(icon: Icons.workspace_premium_outlined, label: "Plano e assinatura",
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionScreen()))),
                   const Divider(),
-                  _ProfileTile(icon: Icons.verified_user_rounded, label: "Privacidade e Consentimento",
+                  _ProfileTile(icon: Icons.verified_user_rounded, label: "Privacidade e consentimento",
                     color: const Color(0xFF6B4FD8),
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsentStatusScreen()))),
                   const Divider(),
@@ -185,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _ProfileTile(icon: Icons.logout_rounded, label: "Sair da conta", onTap: logout),
                   const SizedBox(height: 18),
                   SizedBox(
-                    height: 54,
+                    height: 50,
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFE8505B),
@@ -193,17 +240,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       onPressed: deleting ? null : confirmDeleteAccount,
                       icon: deleting
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.delete_outline_rounded),
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.delete_outline_rounded, size: 20),
                       label: Text(deleting ? "Excluindo..." : "Excluir minha conta",
-                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   const Text(
-                    "A exclusão remove sua conta e todos os dados associados permanentemente.",
+                    "A exclusão remove permanentemente sua conta e todos os dados associados. Será solicitada sua senha para confirmar.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF6B6F8A)),
+                    style: TextStyle(fontSize: 11, height: 1.5, color: Color(0xFF6B6F8A)),
                   ),
                 ],
               ),
@@ -225,7 +272,10 @@ class _ProfileTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, color: color),
-      title: Text(label, style: color != null ? TextStyle(color: color, fontWeight: FontWeight.w700) : null),
+      title: Text(label,
+        style: color != null
+          ? TextStyle(color: color, fontWeight: FontWeight.w600)
+          : const TextStyle(fontWeight: FontWeight.w500)),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: onTap,
     );

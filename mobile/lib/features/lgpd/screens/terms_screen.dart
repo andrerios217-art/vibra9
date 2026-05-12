@@ -21,6 +21,7 @@ class _TermsScreenState extends State<TermsScreen> {
   }
 
   Future<void> load() async {
+    setState(() { loading = true; error = null; });
     try {
       final response = await ApiClient.get("/lgpd/terms");
       if (!mounted) return;
@@ -43,7 +44,22 @@ class _TermsScreenState extends State<TermsScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(child: Text(error!, style: const TextStyle(color: Color(0xFFE8505B))))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Color(0xFFE8505B), size: 40),
+                        const SizedBox(height: 12),
+                        Text(error!, textAlign: TextAlign.center,
+                          style: const TextStyle(color: Color(0xFFE8505B))),
+                        const SizedBox(height: 16),
+                        FilledButton(onPressed: load, child: const Text("Tentar novamente")),
+                      ],
+                    ),
+                  ),
+                )
               : Column(
                   children: [
                     Expanded(
@@ -54,36 +70,40 @@ class _TermsScreenState extends State<TermsScreen> {
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(colors: [Color(0xFF42B8B0), Color(0xFF6B4FD8)]),
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(22),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.gavel_rounded, color: Colors.white, size: 36),
-                                const SizedBox(height: 12),
-                                Text(terms!["title"].toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
-                                const SizedBox(height: 6),
-                                Text("Versão ${terms!["version"]} · Atualizada em ${terms!["updated_at"]}", style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                                const Icon(Icons.gavel_rounded, color: Colors.white, size: 32),
+                                const SizedBox(height: 10),
+                                Text(terms!["title"].toString(),
+                                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Colors.white)),
+                                const SizedBox(height: 4),
+                                Text("Versão ${terms!["version"]} · Atualizada em ${terms!["updated_at"]}",
+                                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 18),
                           ...(terms!["sections"] as List<dynamic>).map((s) {
                             final section = Map<String, dynamic>.from(s);
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 14),
-                              padding: const EdgeInsets.all(18),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFF42B8B0).withOpacity(0.12)),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFF42B8B0).withOpacity(0.10)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(section["title"].toString(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF42B8B0))),
+                                  Text(section["title"].toString(),
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF42B8B0))),
                                   const SizedBox(height: 8),
-                                  Text(section["content"].toString(), style: const TextStyle(fontSize: 13, height: 1.6, color: Color(0xFF4A4A6A))),
+                                  Text(section["content"].toString(),
+                                    style: const TextStyle(fontSize: 13, height: 1.6, color: Color(0xFF4A4A6A))),
                                 ],
                               ),
                             );
@@ -94,17 +114,18 @@ class _TermsScreenState extends State<TermsScreen> {
                     ),
                     if (widget.showAcceptButton)
                       Padding(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(18),
                         child: SizedBox(
                           width: double.infinity,
                           child: FilledButton(
                             onPressed: () => Navigator.pop(context, true),
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFF42B8B0),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
-                            child: const Text("Li e aceito os termos", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                            child: const Text("Li e aceito os termos",
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                           ),
                         ),
                       ),
