@@ -3,7 +3,7 @@
     name: vibra9-backend
     runtime: python
     region: oregon
-    plan: free
+    plan: starter
     branch: main
     rootDir: backend
     buildCommand: pip install -r requirements.txt
@@ -15,7 +15,7 @@
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
-        value: vibra9.db
+        value: /var/data/vibra9.db
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "60"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
@@ -26,3 +26,7 @@
         value: "*"
       - key: PYTHON_VERSION
         value: "3.11.9"
+    disk:
+      name: vibra9-data
+      mountPath: /var/data
+      sizeGB: 1
